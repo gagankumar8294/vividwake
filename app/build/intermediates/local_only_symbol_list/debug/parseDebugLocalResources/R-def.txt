@@ -1,0 +1,32 @@
+R_DEF: Internal format may change without notice
+local
+color accent_glow
+color bg_dark
+color card_dark
+color gold_primary
+color gold_secondary
+color text_primary
+color text_secondary
+drawable first_frame
+drawable last_frame
+id btnPermissions
+id btnSetWallpaper
+id ivFirstFramePreview
+id lockRootView
+id previewTextureView
+id rbFreezeLastFrame
+id rbLoop
+id rgPlaybackMode
+id switchMute
+id switchOverlayMode
+id tvAppInfo
+id tvUnlockHint
+id videoLockTextureView
+layout activity_main
+layout activity_video_lock
+raw lock_wake_video
+string app_name
+string wallpaper_description
+style Theme.VideoLockScreen
+style Theme.VideoLockScreen.Lock
+xml wallpaper

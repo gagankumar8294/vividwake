@@ -1,0 +1,238 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.lockscreen.videowake"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="28"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+11-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:5:5-72
+11-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:5:22-69
+12    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+12-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:6:5-81
+12-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:6:22-78
+13    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+13-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:7:5-78
+13-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:7:22-75
+14    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+14-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:8:5-77
+14-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:8:22-74
+15    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+15-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:9:5-89
+15-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:9:22-86
+16    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+16-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:10:5-81
+16-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:10:22-78
+17    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+17-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:11:5-77
+17-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:11:22-74
+18    <uses-permission android:name="android.permission.WAKE_LOCK" />
+18-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:12:5-68
+18-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:12:22-65
+19
+20    <permission
+20-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:22:5-24:47
+21        android:name="com.lockscreen.videowake.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+21-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:23:9-81
+22        android:protectionLevel="signature" />
+22-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:24:9-44
+23
+24    <uses-permission android:name="com.lockscreen.videowake.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+24-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:26:5-97
+24-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:26:22-94
+25
+26    <application
+26-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:14:5-79:19
+27        android:allowBackup="true"
+27-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:15:9-35
+28        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+28-->[androidx.core:core:1.13.0] C:\Users\Administrator\.gradle\caches\transforms-4\b09d85cafad70da2c2f5e049103f4d75\transformed\core-1.13.0\AndroidManifest.xml:28:18-86
+29        android:debuggable="true"
+30        android:extractNativeLibs="false"
+31        android:icon="@android:drawable/ic_lock_idle_alarm"
+31-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:16:9-60
+32        android:label="@string/app_name"
+32-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:17:9-41
+33        android:roundIcon="@android:drawable/ic_lock_idle_alarm"
+33-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:18:9-65
+34        android:supportsRtl="true"
+34-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:19:9-35
+35        android:theme="@style/Theme.VideoLockScreen" >
+35-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:20:9-53
+36
+37        <!-- Setup & Settings Activity -->
+38        <activity
+38-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:23:9-30:20
+39            android:name="com.lockscreen.videowake.MainActivity"
+39-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:24:13-41
+40            android:exported="true" >
+40-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:25:13-36
+41            <intent-filter>
+41-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:26:13-29:29
+42                <action android:name="android.intent.action.MAIN" />
+42-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:27:17-69
+42-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:27:25-66
+43
+44                <category android:name="android.intent.category.LAUNCHER" />
+44-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:28:17-77
+44-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:28:27-74
+45            </intent-filter>
+46        </activity>
+47
+48        <!-- Optional Full-Screen Wake Activity -->
+49        <activity
+49-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:33:9-42:65
+50            android:name="com.lockscreen.videowake.VideoLockActivity"
+50-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:34:13-46
+51            android:excludeFromRecents="true"
+51-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:38:13-46
+52            android:exported="true"
+52-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:35:13-36
+53            android:launchMode="singleInstance"
+53-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:39:13-48
+54            android:screenOrientation="portrait"
+54-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:41:13-49
+55            android:showWhenLocked="true"
+55-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:36:13-42
+56            android:taskAffinity=""
+56-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:40:13-36
+57            android:theme="@style/Theme.VideoLockScreen.Lock"
+57-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:42:13-62
+58            android:turnScreenOn="true" />
+58-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:37:13-40
+59
+60        <!-- Native Lock Screen Live Wallpaper Service -->
+61        <service
+61-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:45:9-56:19
+62            android:name="com.lockscreen.videowake.VideoWallpaperService"
+62-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:46:13-50
+63            android:exported="true"
+63-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:49:13-36
+64            android:label="Magical Video Lock"
+64-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:47:13-47
+65            android:permission="android.permission.BIND_WALLPAPER" >
+65-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:48:13-67
+66            <intent-filter>
+66-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:50:13-52:29
+67                <action android:name="android.service.wallpaper.WallpaperService" />
+67-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:51:17-85
+67-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:51:25-82
+68            </intent-filter>
+69
+70            <meta-data
+70-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:53:13-55:53
+71                android:name="android.service.wallpaper"
+71-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:54:17-57
+72                android:resource="@xml/wallpaper" />
+72-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:55:17-50
+73        </service>
+74
+75        <!-- Background Wake Monitoring Service -->
+76        <service
+76-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:59:9-66:19
+77            android:name="com.lockscreen.videowake.VideoWakeService"
+77-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:60:13-45
+78            android:exported="false"
+78-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:61:13-37
+79            android:foregroundServiceType="specialUse" >
+79-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:62:13-55
+80            <property
+80-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:63:13-65:100
+81                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+81-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:64:17-76
+82                android:value="Monitors screen wake events to present the video lock animation." />
+82-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:65:17-97
+83        </service>
+84
+85        <!-- Boot Receiver -->
+86        <receiver
+86-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:69:9-77:20
+87            android:name="com.lockscreen.videowake.BootReceiver"
+87-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:70:13-41
+88            android:enabled="true"
+88-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:72:13-35
+89            android:exported="true" >
+89-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:71:13-36
+90            <intent-filter android:priority="999" >
+90-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:73:13-76:29
+90-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:73:28-50
+91                <action android:name="android.intent.action.BOOT_COMPLETED" />
+91-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:74:17-79
+91-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:74:25-76
+92                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+92-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:75:17-86
+92-->C:\Users\Administrator\Desktop\VideoLockScreen\app\src\main\AndroidManifest.xml:75:25-83
+93            </intent-filter>
+94        </receiver>
+95
+96        <provider
+96-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+97            android:name="androidx.startup.InitializationProvider"
+97-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+98            android:authorities="com.lockscreen.videowake.androidx-startup"
+98-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+99            android:exported="false" >
+99-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+100            <meta-data
+100-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+101                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+101-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+102                android:value="androidx.startup" />
+102-->[androidx.emoji2:emoji2:1.3.0] C:\Users\Administrator\.gradle\caches\transforms-4\033a9ebd21d032f53421a9afd950cf80\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+103            <meta-data
+103-->[androidx.lifecycle:lifecycle-process:2.8.0] C:\Users\Administrator\.gradle\caches\transforms-4\7a7b8956d125abdb6b9b506abb617182\transformed\lifecycle-process-2.8.0\AndroidManifest.xml:29:13-31:52
+104                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+104-->[androidx.lifecycle:lifecycle-process:2.8.0] C:\Users\Administrator\.gradle\caches\transforms-4\7a7b8956d125abdb6b9b506abb617182\transformed\lifecycle-process-2.8.0\AndroidManifest.xml:30:17-78
+105                android:value="androidx.startup" />
+105-->[androidx.lifecycle:lifecycle-process:2.8.0] C:\Users\Administrator\.gradle\caches\transforms-4\7a7b8956d125abdb6b9b506abb617182\transformed\lifecycle-process-2.8.0\AndroidManifest.xml:31:17-49
+106            <meta-data
+106-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:29:13-31:52
+107                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+107-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:30:17-85
+108                android:value="androidx.startup" />
+108-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:31:17-49
+109        </provider>
+110
+111        <receiver
+111-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:34:9-52:20
+112            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+112-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:35:13-76
+113            android:directBootAware="false"
+113-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:36:13-44
+114            android:enabled="true"
+114-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:37:13-35
+115            android:exported="true"
+115-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:38:13-36
+116            android:permission="android.permission.DUMP" >
+116-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:39:13-57
+117            <intent-filter>
+117-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:40:13-42:29
+118                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+118-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:17-91
+118-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:41:25-88
+119            </intent-filter>
+120            <intent-filter>
+120-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:43:13-45:29
+121                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+121-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:17-85
+121-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:44:25-82
+122            </intent-filter>
+123            <intent-filter>
+123-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:46:13-48:29
+124                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+124-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:17-88
+124-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:47:25-85
+125            </intent-filter>
+126            <intent-filter>
+126-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:49:13-51:29
+127                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+127-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:17-95
+127-->[androidx.profileinstaller:profileinstaller:1.3.1] C:\Users\Administrator\.gradle\caches\transforms-4\ae1c696db2a24876150fb851007cfd16\transformed\profileinstaller-1.3.1\AndroidManifest.xml:50:25-92
+128            </intent-filter>
+129        </receiver>
+130    </application>
+131
+132</manifest>

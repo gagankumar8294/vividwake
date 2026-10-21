@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_dark">#0E0B16</color>
+    <color name="card_dark">#1A1528</color>
+    <color name="gold_primary">#D4AF37</color>
+    <color name="gold_secondary">#F3E5AB</color>
+    <color name="accent_glow">#9370DB</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B0A8C0</color>
+</resources>

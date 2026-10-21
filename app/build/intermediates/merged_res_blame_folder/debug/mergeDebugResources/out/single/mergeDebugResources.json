@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/layout_activity_main.xml.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/layout_activity_video_lock.xml.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/layout/activity_video_lock.xml"
+    },
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/drawable_last_frame.png.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/drawable/last_frame.png"
+    },
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/raw_lock_wake_video.mp4.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/raw/lock_wake_video.mp4"
+    },
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/xml_wallpaper.xml.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/xml/wallpaper.xml"
+    },
+    {
+        "merged": "com.lockscreen.videowake.app-debug-37:/drawable_first_frame.png.flat",
+        "source": "com.lockscreen.videowake.app-main-39:/drawable/first_frame.png"
+    }
+]
