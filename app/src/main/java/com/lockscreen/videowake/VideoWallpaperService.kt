@@ -175,6 +175,46 @@ class VideoWallpaperService : WallpaperService() {
             }
         }
 
+        private fun chooseEglConfig(display: EGLDisplay): EGLConfig? {
+            val configs = arrayOfNulls<EGLConfig>(1)
+            val numConfigs = IntArray(1)
+
+            // Priority 1: Standard 32-bit (RGBA 8888) with ES2
+            val attribList32 = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE
+            )
+            if (EGL14.eglChooseConfig(display, attribList32, 0, configs, 0, 1, numConfigs, 0) && numConfigs[0] > 0 && configs[0] != null) {
+                return configs[0]
+            }
+
+            // Priority 2: 16-bit (RGB 565) with ES2 (for budget / older Mali or PowerVR GPUs)
+            val attribList16 = intArrayOf(
+                EGL14.EGL_RED_SIZE, 5,
+                EGL14.EGL_GREEN_SIZE, 6,
+                EGL14.EGL_BLUE_SIZE, 5,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE
+            )
+            if (EGL14.eglChooseConfig(display, attribList16, 0, configs, 0, 1, numConfigs, 0) && numConfigs[0] > 0 && configs[0] != null) {
+                return configs[0]
+            }
+
+            // Priority 3: Fallback any available config with ES2
+            val attribListAny = intArrayOf(
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE
+            )
+            if (EGL14.eglChooseConfig(display, attribListAny, 0, configs, 0, 1, numConfigs, 0) && numConfigs[0] > 0 && configs[0] != null) {
+                return configs[0]
+            }
+
+            return null
+        }
+
         private fun initGL(holder: SurfaceHolder) {
             releaseGL()
 
@@ -182,18 +222,10 @@ class VideoWallpaperService : WallpaperService() {
             val version = IntArray(2)
             EGL14.eglInitialize(eglDisplay, version, 0, version, 1)
 
-            val attribList = intArrayOf(
-                EGL14.EGL_RED_SIZE, 8,
-                EGL14.EGL_GREEN_SIZE, 8,
-                EGL14.EGL_BLUE_SIZE, 8,
-                EGL14.EGL_ALPHA_SIZE, 8,
-                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-                EGL14.EGL_NONE
-            )
-            val configs = arrayOfNulls<EGLConfig>(1)
-            val numConfigs = IntArray(1)
-            EGL14.eglChooseConfig(eglDisplay, attribList, 0, configs, 0, 1, numConfigs, 0)
-            val config = configs[0] ?: return
+            val config = chooseEglConfig(eglDisplay) ?: run {
+                Log.e(TAG, "No suitable EGLConfig found on this GPU")
+                return
+            }
 
             val contextAttribs = intArrayOf(
                 EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
@@ -203,6 +235,11 @@ class VideoWallpaperService : WallpaperService() {
 
             val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
             eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, config, holder.surface, surfaceAttribs, 0)
+
+            if (eglSurface == EGL14.EGL_NO_SURFACE) {
+                Log.e(TAG, "Failed to create EGL window surface")
+                return
+            }
 
             EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
 

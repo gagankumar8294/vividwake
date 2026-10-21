@@ -87,21 +87,51 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun openLiveWallpaperChooser() {
+        val component = ComponentName(this, VideoWallpaperService::class.java)
+
+        // Attempt 1: Direct live wallpaper preview intent
         try {
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                putExtra(
-                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                    ComponentName(this@MainActivity, VideoWallpaperService::class.java)
-                )
+                putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
+                putExtra("SET_LOCKSCREEN_WALLPAPER", true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
+            return
         } catch (e: Exception) {
-            try {
-                val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
-                startActivity(fallbackIntent)
-            } catch (ex: Exception) {
-                Toast.makeText(this, "Please open Settings -> Wallpaper -> Live Wallpapers", Toast.LENGTH_SHORT).show()
+            // Log and fallback
+        }
+
+        // Attempt 2: Live wallpaper chooser picker
+        try {
+            val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            startActivity(fallbackIntent)
+            return
+        } catch (e: Exception) {
+            // Log and fallback
+        }
+
+        // Attempt 3: General system wallpaper picker
+        try {
+            val fallbackIntent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(fallbackIntent)
+            return
+        } catch (e: Exception) {
+            // Log and fallback
+        }
+
+        // Attempt 4: System display settings
+        try {
+            val settingsIntent = Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(settingsIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Please open Settings -> Wallpaper -> Live Wallpapers", Toast.LENGTH_LONG).show()
         }
     }
 
