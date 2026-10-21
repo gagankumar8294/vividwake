@@ -86,9 +86,22 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Tap to open wallpaper preview, then tap 'Set wallpaper' -> 'Home screen and lock screen'"
-            android:textColor="#8E85A2"
-            android:textSize="12sp" />
+            android:text="Important: In the preview, tap 'Set wallpaper' -> choose 'Home screen and lock screen'"
+            android:textColor="#D4AF37"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnClearLockOverride"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="🔄 Fix Lock Screen (If only Home Screen changed)"
+            android:textAllCaps="false"
+            android:textColor="#E0D7F5"
+            app:strokeColor="#5B4A78"
+            app:cornerRadius="12dp" />
 
         <!-- Settings Section Card -->
         <com.google.android.material.card.MaterialCardView

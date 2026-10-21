@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private lateinit var previewTextureView: TextureView
     private lateinit var btnSetWallpaper: MaterialButton
+    private lateinit var btnClearLockOverride: MaterialButton
     private lateinit var rgPlaybackMode: RadioGroup
     private lateinit var rbFreezeLastFrame: RadioButton
     private lateinit var rbLoop: RadioButton
@@ -39,6 +40,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         previewTextureView = findViewById(R.id.previewTextureView)
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
+        btnClearLockOverride = findViewById(R.id.btnClearLockOverride)
         rgPlaybackMode = findViewById(R.id.rgPlaybackMode)
         rbFreezeLastFrame = findViewById(R.id.rbFreezeLastFrame)
         rbLoop = findViewById(R.id.rbLoop)
@@ -64,6 +66,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun setupListeners() {
         btnSetWallpaper.setOnClickListener {
+            // Attempt to clear separate lock screen static override so Live Wallpaper shows on both
+            clearLockScreenOverrideSilently()
+            openLiveWallpaperChooser()
+        }
+
+        btnClearLockOverride.setOnClickListener {
+            clearLockScreenOverrideSilently()
+            Toast.makeText(this, "Cleared lock override! Select 'Home screen and lock screen' in preview", Toast.LENGTH_LONG).show()
             openLiveWallpaperChooser()
         }
 
@@ -83,6 +93,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val vol = if (isChecked) 0f else 1f
                 it.setVolume(vol, vol)
             }
+        }
+    }
+
+    private fun clearLockScreenOverrideSilently() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                val wm = WallpaperManager.getInstance(this)
+                wm.clear(WallpaperManager.FLAG_LOCK)
+            }
+        } catch (e: Exception) {
+            // Ignore if OEM blocks clearing
         }
     }
 
