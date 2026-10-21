@@ -2,12 +2,25 @@ package com.lockscreen.videowake
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
+import android.opengl.EGL14
+import android.opengl.EGLConfig
+import android.opengl.EGLContext
+import android.opengl.EGLDisplay
+import android.opengl.EGLSurface
+import android.opengl.GLES11Ext
+import android.opengl.GLES20
+import android.opengl.Matrix
+import android.os.Handler
+import android.os.HandlerThread
 import android.service.wallpaper.WallpaperService
 import android.util.Log
+import android.view.Surface
 import android.view.SurfaceHolder
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
 
 class VideoWallpaperService : WallpaperService() {
 
@@ -18,96 +31,91 @@ class VideoWallpaperService : WallpaperService() {
         const val KEY_MUTE = "pref_mute"
     }
 
-    override fun onCreateEngine(): Engine = VideoEngine()
+    override fun onCreateEngine(): Engine = GLVideoEngine()
 
-    inner class VideoEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
+    inner class GLVideoEngine : Engine(), SharedPreferences.OnSharedPreferenceChangeListener {
 
-        private var mediaPlayer: MediaPlayer? = null
-        private var isVisibleState = false
-        private var isPrepared = false
+        private lateinit var prefs: SharedPreferences
+        private var glThread: HandlerThread? = null
+        private var glHandler: Handler? = null
+
+        // Dimensions
         private var surfaceWidth = 0
         private var surfaceHeight = 0
-        private lateinit var prefs: SharedPreferences
+        private var videoWidth = 720
+        private var videoHeight = 1280
+
+        // EGL
+        private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
+        private var eglContext: EGLContext = EGL14.EGL_NO_CONTEXT
+        private var eglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+
+        // GL & Video
+        private var program = 0
+        private var uMVPMatrixHandle = 0
+        private var uSTMatrixHandle = 0
+        private var aPositionHandle = 0
+        private var aTextureCoordHandle = 0
+        private var textureId = 0
+
+        private var surfaceTexture: SurfaceTexture? = null
+        private var videoSurface: Surface? = null
+        private var mediaPlayer: MediaPlayer? = null
+
+        private val mvpMatrix = FloatArray(16)
+        private val stMatrix = FloatArray(16)
+
+        private var isVisibleState = false
+        private var isPrepared = false
+
+        // Quad coordinates (X, Y, Z, U, V)
+        private val verticesData = floatArrayOf(
+            -1.0f, -1.0f, 0f, 0f, 0f,
+             1.0f, -1.0f, 0f, 1f, 0f,
+            -1.0f,  1.0f, 0f, 0f, 1f,
+             1.0f,  1.0f, 0f, 1f, 1f
+        )
+        private val verticesBuffer: FloatBuffer = ByteBuffer.allocateDirect(verticesData.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+            .apply {
+                put(verticesData)
+                position(0)
+            }
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.registerOnSharedPreferenceChangeListener(this)
+
+            glThread = HandlerThread("GLVideoWallpaperThread").apply { start() }
+            glHandler = Handler(glThread!!.looper)
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
             Log.d(TAG, "onSurfaceCreated")
-            initMediaPlayer(holder)
+            glHandler?.post {
+                initGL(holder)
+                initMediaPlayer()
+            }
         }
 
         override fun onSurfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
             super.onSurfaceChanged(holder, format, width, height)
+            Log.d(TAG, "onSurfaceChanged: ${width}x${height}")
             surfaceWidth = width
             surfaceHeight = height
-            Log.d(TAG, "onSurfaceChanged: ${width}x${height}")
-
-            // Adjust surface aspect ratio to center-crop if needed
-            if (width > 0 && height > 0) {
-                val videoRatio = 720f / 1280f
-                val screenRatio = width.toFloat() / height.toFloat()
-                if (screenRatio < videoRatio) {
-                    // Screen is taller than video -> widen surface to preserve aspect ratio
-                    val targetWidth = (height * videoRatio).toInt()
-                    holder.setFixedSize(targetWidth, height)
-                } else {
-                    val targetHeight = (width / videoRatio).toInt()
-                    holder.setFixedSize(width, targetHeight)
-                }
-            }
-
-            if (mediaPlayer == null) {
-                initMediaPlayer(holder)
-            }
-        }
-
-        private fun initMediaPlayer(holder: SurfaceHolder) {
-            try {
-                releaseMediaPlayer()
-                mediaPlayer = MediaPlayer().apply {
-                    setDisplay(holder)
-                    val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
-                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                    afd.close()
-
-                    val isMuted = prefs.getBoolean(KEY_MUTE, true)
-                    val volume = if (isMuted) 0f else 1f
-                    setVolume(volume, volume)
-
-                    val isLoopingMode = prefs.getBoolean(KEY_LOOP, false)
-                    isLooping = isLoopingMode
-
-                    setOnPreparedListener { mp ->
-                        isPrepared = true
-                        Log.d(TAG, "MediaPlayer prepared, visible=$isVisibleState")
-                        if (isVisibleState) {
-                            mp.seekTo(0)
-                            mp.start()
-                        }
-                    }
-
-                    setOnCompletionListener {
-                        // Freeze on final frame
-                        Log.d(TAG, "Playback completed, holding final frame statically")
-                    }
-
-                    prepareAsync()
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error initializing MediaPlayer", e)
+            glHandler?.post {
+                updateViewportAndMatrix()
             }
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             this.isVisibleState = visible
             Log.d(TAG, "onVisibilityChanged: $visible, prepared=$isPrepared")
-            val mp = mediaPlayer
-            if (mp != null) {
+            glHandler?.post {
+                val mp = mediaPlayer ?: return@post
                 if (visible) {
                     if (isPrepared) {
                         try {
@@ -132,7 +140,190 @@ class VideoWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder) {
             super.onSurfaceDestroyed(holder)
             Log.d(TAG, "onSurfaceDestroyed")
-            releaseMediaPlayer()
+            glHandler?.post {
+                releaseMediaPlayer()
+                releaseGL()
+            }
+        }
+
+        override fun onDestroy() {
+            prefs.unregisterOnSharedPreferenceChangeListener(this)
+            glHandler?.post {
+                releaseMediaPlayer()
+                releaseGL()
+            }
+            glThread?.quitSafely()
+            glThread = null
+            glHandler = null
+            super.onDestroy()
+        }
+
+        override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+            glHandler?.post {
+                mediaPlayer?.let { mp ->
+                    when (key) {
+                        KEY_MUTE -> {
+                            val isMuted = prefs.getBoolean(KEY_MUTE, true)
+                            val vol = if (isMuted) 0f else 1f
+                            mp.setVolume(vol, vol)
+                        }
+                        KEY_LOOP -> {
+                            mp.isLooping = prefs.getBoolean(KEY_LOOP, false)
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun initGL(holder: SurfaceHolder) {
+            releaseGL()
+
+            eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+            val version = IntArray(2)
+            EGL14.eglInitialize(eglDisplay, version, 0, version, 1)
+
+            val attribList = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_NONE
+            )
+            val configs = arrayOfNulls<EGLConfig>(1)
+            val numConfigs = IntArray(1)
+            EGL14.eglChooseConfig(eglDisplay, attribList, 0, configs, 0, 1, numConfigs, 0)
+            val config = configs[0] ?: return
+
+            val contextAttribs = intArrayOf(
+                EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+                EGL14.EGL_NONE
+            )
+            eglContext = EGL14.eglCreateContext(eglDisplay, config, EGL14.EGL_NO_CONTEXT, contextAttribs, 0)
+
+            val surfaceAttribs = intArrayOf(EGL14.EGL_NONE)
+            eglSurface = EGL14.eglCreateWindowSurface(eglDisplay, config, holder.surface, surfaceAttribs, 0)
+
+            EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+
+            program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
+            if (program == 0) return
+
+            aPositionHandle = GLES20.glGetAttribLocation(program, "aPosition")
+            aTextureCoordHandle = GLES20.glGetAttribLocation(program, "aTextureCoord")
+            uMVPMatrixHandle = GLES20.glGetUniformLocation(program, "uMVPMatrix")
+            uSTMatrixHandle = GLES20.glGetUniformLocation(program, "uSTMatrix")
+
+            val textures = IntArray(1)
+            GLES20.glGenTextures(1, textures, 0)
+            textureId = textures[0]
+            GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+            surfaceTexture = SurfaceTexture(textureId).apply {
+                setOnFrameAvailableListener {
+                    glHandler?.post {
+                        drawFrame()
+                    }
+                }
+            }
+            videoSurface = Surface(surfaceTexture)
+            updateViewportAndMatrix()
+        }
+
+        private fun updateViewportAndMatrix() {
+            if (surfaceWidth <= 0 || surfaceHeight <= 0) return
+            GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight)
+
+            val surfaceRatio = surfaceWidth.toFloat() / surfaceHeight.toFloat()
+            val videoRatio = videoWidth.toFloat() / videoHeight.toFloat()
+
+            Matrix.setIdentityM(mvpMatrix, 0)
+            if (surfaceRatio > videoRatio) {
+                val scaleY = surfaceRatio / videoRatio
+                Matrix.scaleM(mvpMatrix, 0, 1.0f, scaleY, 1.0f)
+            } else {
+                val scaleX = videoRatio / surfaceRatio
+                Matrix.scaleM(mvpMatrix, 0, scaleX, 1.0f, 1.0f)
+            }
+        }
+
+        private fun drawFrame() {
+            if (eglDisplay == EGL14.EGL_NO_DISPLAY || eglSurface == EGL14.EGL_NO_SURFACE) return
+            try {
+                surfaceTexture?.updateTexImage()
+                surfaceTexture?.getTransformMatrix(stMatrix)
+
+                GLES20.glUseProgram(program)
+
+                GLES20.glUniformMatrix4fv(uMVPMatrixHandle, 1, false, mvpMatrix, 0)
+                GLES20.glUniformMatrix4fv(uSTMatrixHandle, 1, false, stMatrix, 0)
+
+                verticesBuffer.position(0)
+                GLES20.glVertexAttribPointer(aPositionHandle, 3, GLES20.GL_FLOAT, false, 5 * 4, verticesBuffer)
+                GLES20.glEnableVertexAttribArray(aPositionHandle)
+
+                verticesBuffer.position(3)
+                GLES20.glVertexAttribPointer(aTextureCoordHandle, 2, GLES20.GL_FLOAT, false, 5 * 4, verticesBuffer)
+                GLES20.glEnableVertexAttribArray(aTextureCoordHandle)
+
+                GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+                GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
+
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+
+                EGL14.eglSwapBuffers(eglDisplay, eglSurface)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error drawing frame", e)
+            }
+        }
+
+        private fun initMediaPlayer() {
+            val vSurface = videoSurface ?: return
+            try {
+                releaseMediaPlayer()
+                mediaPlayer = MediaPlayer().apply {
+                    setSurface(vSurface)
+                    val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+
+                    val isMuted = prefs.getBoolean(KEY_MUTE, true)
+                    val volume = if (isMuted) 0f else 1f
+                    setVolume(volume, volume)
+
+                    val isLoopingMode = prefs.getBoolean(KEY_LOOP, false)
+                    isLooping = isLoopingMode
+
+                    setOnVideoSizeChangedListener { _, w, h ->
+                        if (w > 0 && h > 0) {
+                            this@GLVideoEngine.videoWidth = w
+                            this@GLVideoEngine.videoHeight = h
+                            updateViewportAndMatrix()
+                        }
+                    }
+
+                    setOnPreparedListener { mp ->
+                        isPrepared = true
+                        Log.d(TAG, "MediaPlayer prepared, visible=$isVisibleState, isPreview=$isPreview")
+                        if (isVisibleState || isPreview) {
+                            mp.seekTo(0)
+                            mp.start()
+                        }
+                    }
+
+                    setOnCompletionListener {
+                        Log.d(TAG, "Playback completed, holding final frame statically")
+                    }
+
+                    prepareAsync()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing MediaPlayer", e)
+            }
         }
 
         private fun releaseMediaPlayer() {
@@ -149,25 +340,95 @@ class VideoWallpaperService : WallpaperService() {
             }
         }
 
-        override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-            mediaPlayer?.let { mp ->
-                when (key) {
-                    KEY_MUTE -> {
-                        val isMuted = prefs.getBoolean(KEY_MUTE, true)
-                        val vol = if (isMuted) 0f else 1f
-                        mp.setVolume(vol, vol)
-                    }
-                    KEY_LOOP -> {
-                        mp.isLooping = prefs.getBoolean(KEY_LOOP, false)
-                    }
+        private fun releaseGL() {
+            if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
+                EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+                if (eglSurface != EGL14.EGL_NO_SURFACE) {
+                    EGL14.eglDestroySurface(eglDisplay, eglSurface)
+                    eglSurface = EGL14.EGL_NO_SURFACE
                 }
+                if (eglContext != EGL14.EGL_NO_CONTEXT) {
+                    EGL14.eglDestroyContext(eglDisplay, eglContext)
+                    eglContext = EGL14.EGL_NO_CONTEXT
+                }
+                EGL14.eglTerminate(eglDisplay)
+                eglDisplay = EGL14.EGL_NO_DISPLAY
+            }
+
+            videoSurface?.release()
+            videoSurface = null
+            surfaceTexture?.release()
+            surfaceTexture = null
+
+            if (textureId != 0) {
+                val textures = intArrayOf(textureId)
+                GLES20.glDeleteTextures(1, textures, 0)
+                textureId = 0
+            }
+            if (program != 0) {
+                GLES20.glDeleteProgram(program)
+                program = 0
             }
         }
 
-        override fun onDestroy() {
-            prefs.unregisterOnSharedPreferenceChangeListener(this)
-            releaseMediaPlayer()
-            super.onDestroy()
+        private fun createProgram(vertexSource: String, fragmentSource: String): Int {
+            val vertexShader = loadShader(GLES20.GL_VERTEX_SHADER, vertexSource)
+            if (vertexShader == 0) return 0
+            val pixelShader = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource)
+            if (pixelShader == 0) return 0
+
+            var prog = GLES20.glCreateProgram()
+            if (prog != 0) {
+                GLES20.glAttachShader(prog, vertexShader)
+                GLES20.glAttachShader(prog, pixelShader)
+                GLES20.glLinkProgram(prog)
+                val linkStatus = IntArray(1)
+                GLES20.glGetProgramiv(prog, GLES20.GL_LINK_STATUS, linkStatus, 0)
+                if (linkStatus[0] != GLES20.GL_TRUE) {
+                    Log.e(TAG, "Could not link program: " + GLES20.glGetProgramInfoLog(prog))
+                    GLES20.glDeleteProgram(prog)
+                    prog = 0
+                }
+            }
+            return prog
+        }
+
+        private fun loadShader(shaderType: Int, source: String): Int {
+            var shader = GLES20.glCreateShader(shaderType)
+            if (shader != 0) {
+                GLES20.glShaderSource(shader, source)
+                GLES20.glCompileShader(shader)
+                val compiled = IntArray(1)
+                GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, compiled, 0)
+                if (compiled[0] == 0) {
+                    Log.e(TAG, "Could not compile shader $shaderType: " + GLES20.glGetShaderInfoLog(shader))
+                    GLES20.glDeleteShader(shader)
+                    shader = 0
+                }
+            }
+            return shader
         }
     }
 }
+
+private const val VERTEX_SHADER = """
+    uniform mat4 uMVPMatrix;
+    uniform mat4 uSTMatrix;
+    attribute vec4 aPosition;
+    attribute vec4 aTextureCoord;
+    varying vec2 vTextureCoord;
+    void main() {
+        gl_Position = uMVPMatrix * aPosition;
+        vTextureCoord = (uSTMatrix * aTextureCoord).xy;
+    }
+"""
+
+private const val FRAGMENT_SHADER = """
+    #extension GL_OES_EGL_image_external : require
+    precision mediump float;
+    varying vec2 vTextureCoord;
+    uniform samplerExternalOES sTexture;
+    void main() {
+        gl_FragColor = texture2D(sTexture, vTextureCoord);
+    }
+"""

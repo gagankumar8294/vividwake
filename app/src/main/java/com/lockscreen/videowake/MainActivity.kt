@@ -8,17 +8,13 @@ import android.content.SharedPreferences
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import android.view.Surface
 import android.view.TextureView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 
@@ -30,8 +26,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var rbFreezeLastFrame: RadioButton
     private lateinit var rbLoop: RadioButton
     private lateinit var switchMute: SwitchMaterial
-    private lateinit var switchOverlayMode: SwitchMaterial
-    private lateinit var btnPermissions: MaterialButton
 
     private lateinit var prefs: SharedPreferences
     private var previewPlayer: MediaPlayer? = null
@@ -49,8 +43,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         rbFreezeLastFrame = findViewById(R.id.rbFreezeLastFrame)
         rbLoop = findViewById(R.id.rbLoop)
         switchMute = findViewById(R.id.switchMute)
-        switchOverlayMode = findViewById(R.id.switchOverlayMode)
-        btnPermissions = findViewById(R.id.btnPermissions)
 
         previewTextureView.surfaceTextureListener = this
 
@@ -68,9 +60,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
         switchMute.isChecked = isMute
-
-        val isOverlayEnabled = prefs.getBoolean("pref_overlay_service_enabled", false)
-        switchOverlayMode.isChecked = isOverlayEnabled
     }
 
     private fun setupListeners() {
@@ -95,36 +84,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 it.setVolume(vol, vol)
             }
         }
-
-        switchOverlayMode.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("pref_overlay_service_enabled", isChecked).apply()
-            val serviceIntent = Intent(this, VideoWakeService::class.java)
-            if (isChecked) {
-                try {
-                    ContextCompat.startForegroundService(this, serviceIntent)
-                    Toast.makeText(this, "Full-Screen Wake Service Started", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            } else {
-                stopService(serviceIntent)
-                Toast.makeText(this, "Full-Screen Wake Service Stopped", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        btnPermissions.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                try {
-                    val intent = Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")
-                    )
-                    startActivity(intent)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
     }
 
     private fun openLiveWallpaperChooser() {
@@ -141,7 +100,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
                 startActivity(fallbackIntent)
             } catch (ex: Exception) {
-                Toast.makeText(this, "Unable to open wallpaper settings", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Please open Settings -> Wallpaper -> Live Wallpapers", Toast.LENGTH_SHORT).show()
             }
         }
     }

@@ -16,7 +16,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Lock Screen Video"
+            android:text="Lock Screen Video Wallpaper"
             android:textColor="#D4AF37"
             android:textSize="26sp"
             android:textStyle="bold"
@@ -26,7 +26,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Magical 5-second wake animation with final frame freeze"
+            android:text="Plays a 5-second video on wake, then freezes on the last frame beneath your Moto system clock"
             android:textColor="#B0A8C0"
             android:textSize="14sp" />
 
@@ -70,7 +70,7 @@
             android:id="@+id/btnSetWallpaper"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="24dp"
             android:text="✨ Apply to Lock Screen"
             android:textAllCaps="false"
             android:textColor="#0E0B16"
@@ -84,9 +84,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="8dp"
             android:gravity="center"
-            android:text="Select 'Home and Lock screen' to show behind your Moto system clock"
+            android:text="Tap to open wallpaper preview, then tap 'Set wallpaper' -> 'Home screen and lock screen'"
             android:textColor="#8E85A2"
             android:textSize="12sp" />
 
@@ -110,7 +110,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Playback Options"
+                    android:text="Playback Behavior"
                     android:textColor="#D4AF37"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -161,71 +161,13 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Fullscreen Wake Overlay Alternative Mode -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardBackgroundColor="#1A1528"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp"
-            app:strokeColor="#3D3254"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Full-Screen Takeover Mode"
-                    android:textColor="#D4AF37"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Optionally pop up as a full-screen window on screen wake instead of a wallpaper."
-                    android:textColor="#B0A8C0"
-                    android:textSize="13sp" />
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/switchOverlayMode"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:checked="false"
-                    android:text="Enable Full-Screen Wake Service"
-                    android:textColor="#FFFFFF"
-                    app:thumbTint="#D4AF37"
-                    app:trackTint="#5A4B75" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnPermissions"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:text="Grant Overlay &amp; Wake Permissions"
-                    android:textColor="#D4AF37"
-                    app:strokeColor="#D4AF37"
-                    app:strokeWidth="1dp"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <TextView
             android:id="@+id/tvAppInfo"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="24dp"
             android:gravity="center"
-            android:text="Video Lock Screen v1.0 • Moto G64 5G Ready"
+            android:text="Pure Native Live Wallpaper • Zero Overlays • No Popup Delay"
             android:textColor="#665D7A"
             android:textSize="12sp" />
 

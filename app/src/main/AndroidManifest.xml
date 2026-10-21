@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -29,22 +21,10 @@
             </intent-filter>
         </activity>
 
-        <!-- Optional Full-Screen Wake Activity -->
-        <activity
-            android:name=".VideoLockActivity"
-            android:exported="true"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:excludeFromRecents="true"
-            android:launchMode="singleInstance"
-            android:taskAffinity=""
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.VideoLockScreen.Lock" />
-
         <!-- Native Lock Screen Live Wallpaper Service -->
         <service
             android:name=".VideoWallpaperService"
-            android:label="Magical Video Lock"
+            android:label="Magical Video Lock Wallpaper"
             android:permission="android.permission.BIND_WALLPAPER"
             android:exported="true">
             <intent-filter>
@@ -54,27 +34,6 @@
                 android:name="android.service.wallpaper"
                 android:resource="@xml/wallpaper" />
         </service>
-
-        <!-- Background Wake Monitoring Service -->
-        <service
-            android:name=".VideoWakeService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Monitors screen wake events to present the video lock animation." />
-        </service>
-
-        <!-- Boot Receiver -->
-        <receiver
-            android:name=".BootReceiver"
-            android:exported="true"
-            android:enabled="true">
-            <intent-filter android:priority="999">
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
 
     </application>
 
