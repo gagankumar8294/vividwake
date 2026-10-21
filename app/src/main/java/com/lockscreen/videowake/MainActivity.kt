@@ -1,29 +1,26 @@
 package com.lockscreen.videowake
 
+import android.app.Activity
 import android.app.WallpaperManager
 import android.content.ComponentName
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
-import android.media.MediaScannerConnection
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.view.Surface
 import android.view.TextureView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
-import java.io.File
-import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
@@ -39,6 +36,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var prefs: SharedPreferences
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
+
+    private val saveVideoLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri: Uri? = result.data?.data
+            if (uri != null) {
+                saveVideoToUri(uri)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,7 +95,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         btnExportVideo.setOnClickListener {
-            saveVideoToGallery()
+            promptSaveVideoLocation()
         }
 
         rgPlaybackMode.setOnCheckedChangeListener { _, checkedId ->
@@ -109,42 +117,33 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private fun saveVideoToGallery() {
+    private fun promptSaveVideoLocation() {
         try {
-            val fileName = "HarryPotter_LockScreen_Wake.mp4"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
-                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                    put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/VideoLockScreen")
-                    put(MediaStore.Video.Media.IS_PENDING, 1)
-                }
-                val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues)
-                if (uri != null) {
-                    resources.openRawResource(R.raw.lock_wake_video).use { input ->
-                        contentResolver.openOutputStream(uri)?.use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    contentValues.clear()
-                    contentValues.put(MediaStore.Video.Media.IS_PENDING, 0)
-                    contentResolver.update(uri, contentValues, null, null)
-                    Toast.makeText(this, "Saved to Gallery! In Themes -> My live wallpapers, tap '+' to select it.", Toast.LENGTH_LONG).show()
-                }
-            } else {
-                val moviesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
-                moviesDir.mkdirs()
-                val file = File(moviesDir, fileName)
-                resources.openRawResource(R.raw.lock_wake_video).use { input ->
-                    FileOutputStream(file).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf("video/mp4"), null)
-                Toast.makeText(this, "Saved to Gallery! In Themes -> My live wallpapers, tap '+' to select it.", Toast.LENGTH_LONG).show()
+            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "video/mp4"
+                putExtra(Intent.EXTRA_TITLE, "HarryPotter_LockScreen_Wake.mp4")
             }
+            saveVideoLauncher.launch(intent)
         } catch (e: Exception) {
-            Toast.makeText(this, "Export failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Could not open folder picker: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveVideoToUri(uri: Uri) {
+        try {
+            contentResolver.openOutputStream(uri)?.use { output ->
+                resources.openRawResource(R.raw.lock_wake_video).use { input ->
+                    input.copyTo(output)
+                }
+            }
+            Toast.makeText(
+                this,
+                "Video saved to chosen folder! Now in Themes -> My live wallpapers, tap '+' and select it.",
+                Toast.LENGTH_LONG
+            ).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

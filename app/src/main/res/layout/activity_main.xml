@@ -109,7 +109,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="🎬 Save Video to Gallery (For Xiaomi/Samsung Themes '+' import)"
+            android:text="📁 Choose Folder &amp; Save Video (For Xiaomi/Samsung Themes)"
             android:textAllCaps="false"
             android:textColor="#D4AF37"
             android:textSize="13sp" />
