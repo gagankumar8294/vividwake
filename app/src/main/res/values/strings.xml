@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Video Lock Screen</string>
+    <string name="wallpaper_name">Magical Video Lock Wallpaper</string>
     <string name="wallpaper_description">Plays a magical wake-up video animation every time the screen turns on and freezes smoothly on the final frame beneath your system clock.</string>
 </resources>

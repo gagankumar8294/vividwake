@@ -103,6 +103,17 @@
             app:strokeColor="#5B4A78"
             app:cornerRadius="12dp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnExportVideo"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="🎬 Save Video to Gallery (For Xiaomi/Samsung Themes '+' import)"
+            android:textAllCaps="false"
+            android:textColor="#D4AF37"
+            android:textSize="13sp" />
+
         <!-- Settings Section Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

@@ -24,7 +24,7 @@
         <!-- Native Lock Screen Live Wallpaper Service -->
         <service
             android:name=".VideoWallpaperService"
-            android:label="Magical Video Lock Wallpaper"
+            android:label="@string/wallpaper_name"
             android:permission="android.permission.BIND_WALLPAPER"
             android:exported="true">
             <intent-filter>
