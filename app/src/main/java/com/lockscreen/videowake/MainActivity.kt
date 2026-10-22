@@ -12,20 +12,29 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import java.io.File
+import java.io.FileOutputStream
+import java.util.Locale
 
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
+    private lateinit var tvDeviceBrand: TextView
+    private lateinit var tvPrimaryInstruction: TextView
     private lateinit var previewTextureView: TextureView
     private lateinit var btnSetWallpaper: MaterialButton
+    private lateinit var btnDirectGalleryHandOff: MaterialButton
     private lateinit var btnClearLockOverride: MaterialButton
     private lateinit var btnExportVideo: MaterialButton
     private lateinit var rgPlaybackMode: RadioGroup
@@ -36,6 +45,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var prefs: SharedPreferences
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
+
+    private var isSamsung = false
+    private var isXiaomi = false
+    private var isColorOS = false
 
     private val saveVideoLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -54,8 +67,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         prefs = getSharedPreferences(VideoWallpaperService.PREFS_NAME, Context.MODE_PRIVATE)
 
+        tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
+        tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
         previewTextureView = findViewById(R.id.previewTextureView)
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
+        btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
         btnClearLockOverride = findViewById(R.id.btnClearLockOverride)
         btnExportVideo = findViewById(R.id.btnExportVideo)
         rgPlaybackMode = findViewById(R.id.rgPlaybackMode)
@@ -65,8 +81,46 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         previewTextureView.surfaceTextureListener = this
 
+        detectDeviceBrand()
         loadSavedSettings()
         setupListeners()
+    }
+
+    private fun detectDeviceBrand() {
+        val manufacturer = Build.MANUFACTURER.lowercase(Locale.ROOT)
+        val brand = Build.BRAND.lowercase(Locale.ROOT)
+
+        isSamsung = manufacturer.contains("samsung") || brand.contains("samsung")
+        isXiaomi = manufacturer.contains("xiaomi") || manufacturer.contains("redmi") ||
+                manufacturer.contains("poco") || brand.contains("xiaomi") ||
+                brand.contains("redmi") || brand.contains("poco")
+        isColorOS = manufacturer.contains("oneplus") || manufacturer.contains("oppo") ||
+                manufacturer.contains("realme")
+
+        when {
+            isSamsung -> {
+                tvDeviceBrand.text = "📱 Detected: Samsung Galaxy (One UI)"
+                btnSetWallpaper.text = "📱 Apply to Samsung Lock Screen"
+                tvPrimaryInstruction.text = "Opens Samsung One UI lock screen video setup directly"
+            }
+            isXiaomi -> {
+                tvDeviceBrand.text = "📱 Detected: Xiaomi / Redmi / Poco (HyperOS/MIUI)"
+                btnSetWallpaper.text = "📱 Open in Xiaomi Video Wallpaper"
+                tvPrimaryInstruction.text = "Opens video player: tap '...' ➔ 'Set video wallpaper' ➔ 'Lock screen'"
+            }
+            isColorOS -> {
+                val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                tvDeviceBrand.text = "📱 Detected: $brandName (OxygenOS / ColorOS)"
+                btnSetWallpaper.text = "✨ Apply to Lock Screen"
+                tvPrimaryInstruction.text = "Select 'Home and Lock screen'. Note: turn off 'Lock Screen Magazine' if it reverts."
+            }
+            else -> {
+                val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                tvDeviceBrand.text = "📱 Detected: $brandName (Native AOSP)"
+                btnSetWallpaper.text = "✨ Apply to Lock Screen"
+                tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
+            }
+        }
     }
 
     private fun loadSavedSettings() {
@@ -83,14 +137,34 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun setupListeners() {
         btnSetWallpaper.setOnClickListener {
-            // Attempt to clear separate lock screen static override so Live Wallpaper shows on both
-            clearLockScreenOverrideSilently()
-            openLiveWallpaperChooser()
+            when {
+                isSamsung -> {
+                    val uri = getCachedVideoUri()
+                    if (uri != null) launchSamsungVideoWallpaper(uri) else openLiveWallpaperChooser()
+                }
+                isXiaomi -> {
+                    val uri = getCachedVideoUri()
+                    if (uri != null) launchXiaomiVideoWallpaper(uri) else openLiveWallpaperChooser()
+                }
+                else -> {
+                    clearLockScreenOverrideSilently()
+                    openLiveWallpaperChooser()
+                }
+            }
+        }
+
+        btnDirectGalleryHandOff.setOnClickListener {
+            val uri = getCachedVideoUri()
+            if (uri != null) {
+                launchGalleryVideo(uri)
+            } else {
+                Toast.makeText(this, "Could not prepare video file", Toast.LENGTH_SHORT).show()
+            }
         }
 
         btnClearLockOverride.setOnClickListener {
             clearLockScreenOverrideSilently()
-            Toast.makeText(this, "Cleared lock override! Select 'Home screen and lock screen' in preview", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Cleared lock photo override! Select 'Home screen and lock screen' in preview", Toast.LENGTH_LONG).show()
             openLiveWallpaperChooser()
         }
 
@@ -114,6 +188,67 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val vol = if (isChecked) 0f else 1f
                 it.setVolume(vol, vol)
             }
+        }
+    }
+
+    private fun getCachedVideoUri(): Uri? {
+        return try {
+            val videoDir = File(cacheDir, "videos").apply { mkdirs() }
+            val videoFile = File(videoDir, "HarryPotter_LockScreen_Wake.mp4")
+            if (!videoFile.exists() || videoFile.length() == 0L) {
+                resources.openRawResource(R.raw.lock_wake_video).use { input ->
+                    FileOutputStream(videoFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+            FileProvider.getUriForFile(this, "${packageName}.fileprovider", videoFile)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error creating cached video file", e)
+            null
+        }
+    }
+
+    private fun launchSamsungVideoWallpaper(uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_ATTACH_DATA).apply {
+                setDataAndType(uri, "video/mp4")
+                putExtra("mimeType", "video/mp4")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Set as Lock Screen Wallpaper"))
+        } catch (e: Exception) {
+            launchGalleryVideo(uri)
+        }
+    }
+
+    private fun launchXiaomiVideoWallpaper(uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "video/mp4")
+                setPackage("com.miui.gallery")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            Toast.makeText(this, "Tap '...' at bottom ➔ 'Set video wallpaper' ➔ 'Lock screen'", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            launchGalleryVideo(uri)
+        }
+    }
+
+    private fun launchGalleryVideo(uri: Uri) {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "video/mp4")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Open Video to Set as Wallpaper"))
+            Toast.makeText(this, "In video options, tap 'Set as video wallpaper' ➔ 'Lock screen'", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open video player: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -149,7 +284,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun clearLockScreenOverrideSilently() {
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 val wm = WallpaperManager.getInstance(this)
                 wm.clear(WallpaperManager.FLAG_LOCK)
             }
