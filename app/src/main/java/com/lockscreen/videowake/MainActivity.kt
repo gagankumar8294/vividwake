@@ -8,23 +8,36 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
+import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Locale
 
@@ -32,7 +45,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
+    private lateinit var tvActiveWallpaperSubtitle: TextView
     private lateinit var previewTextureView: TextureView
+    private lateinit var rvWallpapers: RecyclerView
+    private lateinit var layoutImporting: LinearLayout
+    private lateinit var tvImportingStatus: TextView
     private lateinit var btnSetWallpaper: MaterialButton
     private lateinit var btnDirectGalleryHandOff: MaterialButton
     private lateinit var btnClearLockOverride: MaterialButton
@@ -43,21 +60,36 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var switchMute: SwitchMaterial
 
     private lateinit var prefs: SharedPreferences
+    private lateinit var repository: WallpaperRepository
+    private lateinit var adapter: WallpaperAdapter
+
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
+    private var previewWidth = 0
+    private var previewHeight = 0
 
     private var isSamsung = false
     private var isXiaomi = false
     private var isColorOS = false
 
+    // SAF Save Video to chosen folder
     private val saveVideoLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val uri: Uri? = result.data?.data
             if (uri != null) {
-                saveVideoToUri(uri)
+                saveActiveVideoToUri(uri)
             }
+        }
+    }
+
+    // Video Picker to import any video
+    private val pickVideoLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            importVideoFromUri(uri)
         }
     }
 
@@ -66,10 +98,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         setContentView(R.layout.activity_main)
 
         prefs = getSharedPreferences(VideoWallpaperService.PREFS_NAME, Context.MODE_PRIVATE)
+        repository = WallpaperRepository(this)
 
         tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
+        tvActiveWallpaperSubtitle = findViewById(R.id.tvActiveWallpaperSubtitle)
         previewTextureView = findViewById(R.id.previewTextureView)
+        rvWallpapers = findViewById(R.id.rvWallpapers)
+        layoutImporting = findViewById(R.id.layoutImporting)
+        tvImportingStatus = findViewById(R.id.tvImportingStatus)
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
         btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
         btnClearLockOverride = findViewById(R.id.btnClearLockOverride)
@@ -82,6 +119,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         previewTextureView.surfaceTextureListener = this
 
         detectDeviceBrand()
+        setupGalleryRecyclerView()
         loadSavedSettings()
         setupListeners()
     }
@@ -123,6 +161,102 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private fun setupGalleryRecyclerView() {
+        adapter = WallpaperAdapter(
+            context = this,
+            scope = lifecycleScope,
+            onSelectWallpaper = { item ->
+                selectWallpaper(item)
+            },
+            onDeleteWallpaper = { item ->
+                confirmDeleteWallpaper(item)
+            },
+            onAddVideoClicked = {
+                openVideoPicker()
+            }
+        )
+
+        rvWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        rvWallpapers.adapter = adapter
+
+        refreshGallery()
+    }
+
+    private fun refreshGallery() {
+        val allWallpapers = repository.getAllWallpapers()
+        val activeItem = repository.getActiveWallpaper()
+        adapter.submitList(allWallpapers, activeItem.id)
+        updateSubtitle(activeItem)
+    }
+
+    private fun updateSubtitle(item: WallpaperItem) {
+        val modeText = if (prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)) "Continuous Loop" else "Plays on wake, freezes on final frame"
+        tvActiveWallpaperSubtitle.text = "Active: ${item.title} • $modeText"
+    }
+
+    private fun selectWallpaper(item: WallpaperItem) {
+        repository.setActiveWallpaper(item)
+        adapter.setActiveId(item.id)
+        updateSubtitle(item)
+        playActiveVideoInPreview(item)
+        Toast.makeText(this, "Active lock screen set to: ${item.title}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun confirmDeleteWallpaper(item: WallpaperItem) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Wallpaper")
+            .setMessage("Remove '${item.title}' from your gallery?")
+            .setPositiveButton("Delete") { _, _ ->
+                repository.deleteWallpaper(item)
+                refreshGallery()
+                val current = repository.getActiveWallpaper()
+                playActiveVideoInPreview(current)
+                Toast.makeText(this, "Wallpaper removed", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun openVideoPicker() {
+        try {
+            pickVideoLauncher.launch("video/*")
+        } catch (e: Exception) {
+            Toast.makeText(this, "Could not open media picker: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun importVideoFromUri(uri: Uri) {
+        layoutImporting.visibility = View.VISIBLE
+        tvImportingStatus.text = "Importing and optimizing video..."
+
+        lifecycleScope.launch {
+            val fileName = queryDisplayName(uri)
+            val result = repository.importVideo(uri, fileName)
+
+            layoutImporting.visibility = View.GONE
+            result.onSuccess { newItem ->
+                refreshGallery()
+                selectWallpaper(newItem)
+                Toast.makeText(this@MainActivity, "✨ Added '${newItem.title}' to gallery!", Toast.LENGTH_LONG).show()
+            }.onFailure { err ->
+                Toast.makeText(this@MainActivity, "Failed to import video: ${err.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        var name: String? = null
+        try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx >= 0) name = cursor.getString(nameIdx)
+                }
+            }
+        } catch (_: Exception) {}
+        return name
+    }
+
     private fun loadSavedSettings() {
         val isLoop = prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)
         if (isLoop) {
@@ -137,13 +271,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun setupListeners() {
         btnSetWallpaper.setOnClickListener {
+            val activeItem = repository.getActiveWallpaper()
             when {
                 isSamsung -> {
-                    val uri = getCachedVideoUri()
+                    val uri = getActiveVideoUri(activeItem)
                     if (uri != null) launchSamsungVideoWallpaper(uri) else openLiveWallpaperChooser()
                 }
                 isXiaomi -> {
-                    val uri = getCachedVideoUri()
+                    val uri = getActiveVideoUri(activeItem)
                     if (uri != null) launchXiaomiVideoWallpaper(uri) else openLiveWallpaperChooser()
                 }
                 else -> {
@@ -154,7 +289,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         btnDirectGalleryHandOff.setOnClickListener {
-            val uri = getCachedVideoUri()
+            val activeItem = repository.getActiveWallpaper()
+            val uri = getActiveVideoUri(activeItem)
             if (uri != null) {
                 launchGalleryVideo(uri)
             } else {
@@ -175,6 +311,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         rgPlaybackMode.setOnCheckedChangeListener { _, checkedId ->
             val loop = (checkedId == R.id.rbLoop)
             prefs.edit().putBoolean(VideoWallpaperService.KEY_LOOP, loop).apply()
+            updateSubtitle(repository.getActiveWallpaper())
             Toast.makeText(
                 this,
                 if (loop) "Mode: Continuous Loop" else "Mode: Wake Animation (Freeze on End Frame)",
@@ -191,20 +328,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private fun getCachedVideoUri(): Uri? {
+    private fun getActiveVideoUri(item: WallpaperItem): Uri? {
         return try {
-            val videoDir = File(cacheDir, "videos").apply { mkdirs() }
-            val videoFile = File(videoDir, "HarryPotter_LockScreen_Wake.mp4")
-            if (!videoFile.exists() || videoFile.length() == 0L) {
-                resources.openRawResource(R.raw.lock_wake_video).use { input ->
-                    FileOutputStream(videoFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-            }
-            FileProvider.getUriForFile(this, "${packageName}.fileprovider", videoFile)
+            val file = repository.getFileForSharing(item) ?: return null
+            FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
         } catch (e: Exception) {
-            Log.e("MainActivity", "Error creating cached video file", e)
+            Log.e("MainActivity", "Error getting Uri for active video", e)
             null
         }
     }
@@ -254,10 +383,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun promptSaveVideoLocation() {
         try {
+            val activeItem = repository.getActiveWallpaper()
+            val fileName = "${activeItem.title.replace(Regex("[^a-zA-Z0-9_]"), "_")}.mp4"
             val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
                 type = "video/mp4"
-                putExtra(Intent.EXTRA_TITLE, "HarryPotter_LockScreen_Wake.mp4")
+                putExtra(Intent.EXTRA_TITLE, fileName)
             }
             saveVideoLauncher.launch(intent)
         } catch (e: Exception) {
@@ -265,16 +396,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private fun saveVideoToUri(uri: Uri) {
+    private fun saveActiveVideoToUri(destUri: Uri) {
+        val activeItem = repository.getActiveWallpaper()
         try {
-            contentResolver.openOutputStream(uri)?.use { output ->
-                resources.openRawResource(R.raw.lock_wake_video).use { input ->
-                    input.copyTo(output)
+            contentResolver.openOutputStream(destUri)?.use { output ->
+                if (activeItem.isPreset) {
+                    resources.openRawResource(activeItem.rawResId).use { input ->
+                        input.copyTo(output)
+                    }
+                } else {
+                    val f = File(activeItem.filePath)
+                    if (f.exists()) {
+                        FileInputStream(f).use { input ->
+                            input.copyTo(output)
+                        }
+                    }
                 }
+                output.flush()
             }
             Toast.makeText(
                 this,
-                "Video saved to chosen folder! Now in Themes -> My live wallpapers, tap '+' and select it.",
+                "Video saved to chosen folder!",
                 Toast.LENGTH_LONG
             ).show()
         } catch (e: Exception) {
@@ -288,15 +430,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val wm = WallpaperManager.getInstance(this)
                 wm.clear(WallpaperManager.FLAG_LOCK)
             }
-        } catch (e: Exception) {
-            // Ignore if OEM blocks clearing
-        }
+        } catch (_: Exception) {}
     }
 
     private fun openLiveWallpaperChooser() {
         val component = ComponentName(this, VideoWallpaperService::class.java)
 
-        // Attempt 1: Direct live wallpaper preview intent
         try {
             val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
                 putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
@@ -305,51 +444,45 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
             startActivity(intent)
             return
-        } catch (e: Exception) {
-            // Log and fallback
-        }
+        } catch (_: Exception) {}
 
-        // Attempt 2: Live wallpaper chooser picker
         try {
             val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(fallbackIntent)
             return
-        } catch (e: Exception) {
-            // Log and fallback
-        }
+        } catch (_: Exception) {}
 
-        // Attempt 3: General system wallpaper picker
         try {
             val fallbackIntent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(fallbackIntent)
             return
-        } catch (e: Exception) {
-            // Log and fallback
-        }
+        } catch (_: Exception) {}
 
-        // Attempt 4: System display settings
         try {
             val settingsIntent = Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(settingsIntent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, "Please open Settings -> Wallpaper -> Live Wallpapers", Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
         previewSurface = Surface(surfaceTexture)
-        adjustPreviewAspect(width, height)
-        startPreviewPlayback()
+        previewWidth = width
+        previewHeight = height
+        playActiveVideoInPreview(repository.getActiveWallpaper())
     }
 
     override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
-        adjustPreviewAspect(width, height)
+        previewWidth = width
+        previewHeight = height
+        adjustPreviewAspect(previewPlayer?.videoWidth ?: 720, previewPlayer?.videoHeight ?: 1280, 0)
     }
 
     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
@@ -361,44 +494,85 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
 
-    private fun adjustPreviewAspect(viewW: Int, viewH: Int) {
-        if (viewW == 0 || viewH == 0) return
-        val videoW = 720f
-        val videoH = 1280f
-        val viewRatio = viewW.toFloat() / viewH
-        val videoRatio = videoW / videoH
+    private fun adjustPreviewAspect(videoW: Int, videoH: Int, rotation: Int) {
+        if (previewWidth == 0 || previewHeight == 0 || videoW == 0 || videoH == 0) return
+
+        val effW = if (rotation == 90 || rotation == 270) videoH else videoW
+        val effH = if (rotation == 90 || rotation == 270) videoW else videoH
+
+        val viewRatio = previewWidth.toFloat() / previewHeight.toFloat()
+        val videoRatio = effW.toFloat() / effH.toFloat()
 
         val matrix = Matrix()
         if (viewRatio < videoRatio) {
-            val scaleX = (viewH * videoRatio) / viewW
-            matrix.setScale(scaleX, 1.0f, viewW / 2f, viewH / 2f)
+            val scaleX = (previewHeight * videoRatio) / previewWidth
+            matrix.setScale(scaleX, 1.0f, previewWidth / 2f, previewHeight / 2f)
         } else {
-            val scaleY = (viewW / videoRatio) / viewH
-            matrix.setScale(1.0f, scaleY, viewW / 2f, viewH / 2f)
+            val scaleY = (previewWidth / videoRatio) / previewHeight
+            matrix.setScale(1.0f, scaleY, previewWidth / 2f, previewHeight / 2f)
         }
         previewTextureView.setTransform(matrix)
     }
 
-    private fun startPreviewPlayback() {
-        if (previewSurface == null) return
+    private fun playActiveVideoInPreview(item: WallpaperItem) {
+        val surface = previewSurface ?: return
         try {
             stopPreviewPlayback()
+            var rotation = 0
+
             previewPlayer = MediaPlayer().apply {
-                setSurface(this@MainActivity.previewSurface)
-                val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
+                setSurface(surface)
+
+                if (item.isPreset) {
+                    val afd = resources.openRawResourceFd(item.rawResId)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                } else {
+                    val file = File(item.filePath)
+                    if (file.exists() && file.length() > 0) {
+                        setDataSource(file.absolutePath)
+                        val retriever = MediaMetadataRetriever()
+                        try {
+                            retriever.setDataSource(file.absolutePath)
+                            rotation = retriever.extractMetadata(
+                                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                            )?.toIntOrNull() ?: 0
+                        } catch (_: Exception) {} finally {
+                            try { retriever.release() } catch (_: Exception) {}
+                        }
+                    } else {
+                        // Fallback to preset
+                        val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        afd.close()
+                    }
+                }
+
                 isLooping = true
                 val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
                 val vol = if (isMute) 0f else 1f
                 setVolume(vol, vol)
+
+                setOnVideoSizeChangedListener { _, w, h ->
+                    if (w > 0 && h > 0) {
+                        adjustPreviewAspect(w, h, rotation)
+                    }
+                }
+
                 setOnPreparedListener { mp ->
+                    adjustPreviewAspect(mp.videoWidth, mp.videoHeight, rotation)
                     mp.start()
                 }
+
+                setOnErrorListener { _, what, extra ->
+                    Log.e("MainActivity", "Preview error $what, $extra")
+                    true
+                }
+
                 prepareAsync()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("MainActivity", "Error playing preview", e)
         }
     }
 
@@ -418,7 +592,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     override fun onResume() {
         super.onResume()
         if (previewSurface != null && (previewPlayer == null || !previewPlayer!!.isPlaying)) {
-            startPreviewPlayback()
+            playActiveVideoInPreview(repository.getActiveWallpaper())
         }
     }
 

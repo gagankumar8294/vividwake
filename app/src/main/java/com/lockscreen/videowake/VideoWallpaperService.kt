@@ -3,6 +3,7 @@ package com.lockscreen.videowake
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.SurfaceTexture
+import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -18,6 +19,7 @@ import android.service.wallpaper.WallpaperService
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -29,6 +31,12 @@ class VideoWallpaperService : WallpaperService() {
         const val PREFS_NAME = "video_lock_prefs"
         const val KEY_LOOP = "pref_loop"
         const val KEY_MUTE = "pref_mute"
+
+        const val KEY_ACTIVE_ID = "pref_active_id"
+        const val KEY_ACTIVE_TYPE = "pref_active_type"         // "preset" or "file"
+        const val KEY_ACTIVE_RES_NAME = "pref_active_res_name" // e.g. "lock_wake_video", "preset_wand_wake"
+        const val KEY_ACTIVE_FILE_PATH = "pref_active_file_path"
+        const val KEY_ACTIVE_TIMESTAMP = "pref_active_timestamp"
     }
 
     override fun onCreateEngine(): Engine = GLVideoEngine()
@@ -44,6 +52,7 @@ class VideoWallpaperService : WallpaperService() {
         private var surfaceHeight = 0
         private var videoWidth = 720
         private var videoHeight = 1280
+        private var videoRotation = 0
 
         // EGL
         private var eglDisplay: EGLDisplay = EGL14.EGL_NO_DISPLAY
@@ -160,16 +169,22 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             glHandler?.post {
-                mediaPlayer?.let { mp ->
-                    when (key) {
-                        KEY_MUTE -> {
+                when (key) {
+                    KEY_MUTE -> {
+                        mediaPlayer?.let { mp ->
                             val isMuted = prefs.getBoolean(KEY_MUTE, true)
                             val vol = if (isMuted) 0f else 1f
                             mp.setVolume(vol, vol)
                         }
-                        KEY_LOOP -> {
+                    }
+                    KEY_LOOP -> {
+                        mediaPlayer?.let { mp ->
                             mp.isLooping = prefs.getBoolean(KEY_LOOP, false)
                         }
+                    }
+                    KEY_ACTIVE_TIMESTAMP, KEY_ACTIVE_ID, KEY_ACTIVE_TYPE, KEY_ACTIVE_FILE_PATH, KEY_ACTIVE_RES_NAME -> {
+                        Log.d(TAG, "Active wallpaper changed! Re-initializing MediaPlayer...")
+                        initMediaPlayer()
                     }
                 }
             }
@@ -322,11 +337,50 @@ class VideoWallpaperService : WallpaperService() {
             val vSurface = videoSurface ?: return
             try {
                 releaseMediaPlayer()
+
+                val activeType = prefs.getString(KEY_ACTIVE_TYPE, "preset") ?: "preset"
+                val activeResName = prefs.getString(KEY_ACTIVE_RES_NAME, "lock_wake_video") ?: "lock_wake_video"
+                val activeFilePath = prefs.getString(KEY_ACTIVE_FILE_PATH, "") ?: ""
+
+                videoRotation = 0
+
                 mediaPlayer = MediaPlayer().apply {
                     setSurface(vSurface)
-                    val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
-                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                    afd.close()
+
+                    var dataSourceLoaded = false
+                    if (activeType == "file" && activeFilePath.isNotEmpty()) {
+                        val file = File(activeFilePath)
+                        if (file.exists() && file.length() > 0) {
+                            try {
+                                setDataSource(file.absolutePath)
+                                dataSourceLoaded = true
+
+                                // Extract rotation if present
+                                val retriever = MediaMetadataRetriever()
+                                try {
+                                    retriever.setDataSource(file.absolutePath)
+                                    videoRotation = retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                                    )?.toIntOrNull() ?: 0
+                                } catch (_: Exception) {} finally {
+                                    try { retriever.release() } catch (_: Exception) {}
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to load custom video data source: $activeFilePath", e)
+                            }
+                        }
+                    }
+
+                    if (!dataSourceLoaded) {
+                        // Built-in presets
+                        val resId = when (activeResName) {
+                            "preset_wand_wake" -> R.raw.preset_wand_wake
+                            else -> R.raw.lock_wake_video
+                        }
+                        val afd = resources.openRawResourceFd(resId)
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        afd.close()
+                    }
 
                     val isMuted = prefs.getBoolean(KEY_MUTE, true)
                     val volume = if (isMuted) 0f else 1f
@@ -337,10 +391,23 @@ class VideoWallpaperService : WallpaperService() {
 
                     setOnVideoSizeChangedListener { _, w, h ->
                         if (w > 0 && h > 0) {
-                            this@GLVideoEngine.videoWidth = w
-                            this@GLVideoEngine.videoHeight = h
+                            if (videoRotation == 90 || videoRotation == 270) {
+                                this@GLVideoEngine.videoWidth = h
+                                this@GLVideoEngine.videoHeight = w
+                            } else {
+                                this@GLVideoEngine.videoWidth = w
+                                this@GLVideoEngine.videoHeight = h
+                            }
                             updateViewportAndMatrix()
                         }
+                    }
+
+                    setOnErrorListener { _, what, extra ->
+                        Log.e(TAG, "MediaPlayer error: what=$what, extra=$extra. Gracefully falling back to default preset.")
+                        glHandler?.post {
+                            fallbackToDefault()
+                        }
+                        true
                     }
 
                     setOnPreparedListener { mp ->
@@ -360,6 +427,20 @@ class VideoWallpaperService : WallpaperService() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error initializing MediaPlayer", e)
+            }
+        }
+
+        private fun fallbackToDefault() {
+            try {
+                prefs.edit()
+                    .putString(KEY_ACTIVE_ID, WallpaperRepository.ID_PRESET_TRIO)
+                    .putString(KEY_ACTIVE_TYPE, "preset")
+                    .putString(KEY_ACTIVE_RES_NAME, "lock_wake_video")
+                    .remove(KEY_ACTIVE_FILE_PATH)
+                    .putLong(KEY_ACTIVE_TIMESTAMP, System.currentTimeMillis())
+                    .apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during fallback", e)
             }
         }
 

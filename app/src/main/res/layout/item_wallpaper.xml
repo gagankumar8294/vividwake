@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/cardWallpaper"
+    android:layout_width="116dp"
+    android:layout_height="186dp"
+    android:layout_marginEnd="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="#1A1528"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="4dp"
+    app:strokeColor="#3D3254"
+    app:strokeWidth="1.5dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Wallpaper Thumbnail -->
+        <ImageView
+            android:id="@+id/ivThumbnail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Wallpaper Thumbnail"
+            android:scaleType="centerCrop" />
+
+        <!-- Gradient Vignette at bottom for title readability -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_gravity="bottom"
+            android:background="#B30E0B16" />
+
+        <!-- Wallpaper Title -->
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingHorizontal="6dp"
+            android:paddingBottom="8dp"
+            android:text="Wallpaper"
+            android:textColor="#F3E8FF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <!-- Active Indicator Badge -->
+        <TextView
+            android:id="@+id/tvActiveBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="8dp"
+            android:background="#E6D4AF37"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:text="✓ ACTIVE"
+            android:textColor="#0E0B16"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <!-- Delete Button for custom imported videos -->
+        <ImageButton
+            android:id="@+id/btnDelete"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="6dp"
+            android:background="#B31A1528"
+            android:contentDescription="Delete Wallpaper"
+            android:padding="5dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_menu_delete"
+            app:tint="#FF6B6B"
+            android:visibility="gone" />
+
+    </FrameLayout>
+</com.google.android.material.card.MaterialCardView>
