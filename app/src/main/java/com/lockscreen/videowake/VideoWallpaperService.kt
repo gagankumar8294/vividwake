@@ -146,6 +146,18 @@ class VideoWallpaperService : WallpaperService() {
             // Explicit NO-OP. Do not perform any work or GL redraw on home screen page scroll
         }
 
+        override fun onCommand(
+            action: String?,
+            x: Int,
+            y: Int,
+            z: Int,
+            extras: android.os.Bundle?,
+            resultRequested: Boolean
+        ): android.os.Bundle? {
+            // Explicitly ignore OEM launcher touch/scroll commands to maintain maximum UI performance
+            return null
+        }
+
         private fun registerSystemReceiver() {
             val filter = IntentFilter().apply {
                 addAction(Intent.ACTION_USER_PRESENT)
@@ -214,6 +226,8 @@ class VideoWallpaperService : WallpaperService() {
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
             Log.d(TAG, "onSurfaceCreated")
+            setOffsetNotificationsEnabled(false)
+            setTouchEventsEnabled(false)
             glHandler?.post {
                 initGL(holder)
                 initMediaPlayer()
