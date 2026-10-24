@@ -226,8 +226,6 @@ class VideoWallpaperService : WallpaperService() {
         override fun onSurfaceCreated(holder: SurfaceHolder) {
             super.onSurfaceCreated(holder)
             Log.d(TAG, "onSurfaceCreated")
-            setOffsetNotificationsEnabled(false)
-            setTouchEventsEnabled(false)
             glHandler?.post {
                 initGL(holder)
                 initMediaPlayer()
