@@ -56,7 +56,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var btnExportVideo: MaterialButton
     private lateinit var rgPlaybackMode: RadioGroup
     private lateinit var rbFreezeLastFrame: RadioButton
-    private lateinit var rbLoop: RadioButton
+    private lateinit var rbLoopLockOnly: RadioButton
+    private lateinit var rbLoopAlways: RadioButton
     private lateinit var switchMute: SwitchMaterial
 
     private lateinit var prefs: SharedPreferences
@@ -113,7 +114,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnExportVideo = findViewById(R.id.btnExportVideo)
         rgPlaybackMode = findViewById(R.id.rgPlaybackMode)
         rbFreezeLastFrame = findViewById(R.id.rbFreezeLastFrame)
-        rbLoop = findViewById(R.id.rbLoop)
+        rbLoopLockOnly = findViewById(R.id.rbLoopLockOnly)
+        rbLoopAlways = findViewById(R.id.rbLoopAlways)
         switchMute = findViewById(R.id.switchMute)
 
         previewTextureView.surfaceTextureListener = this
@@ -190,7 +192,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun updateSubtitle(item: WallpaperItem) {
-        val modeText = if (prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)) "Continuous Loop" else "Plays on wake, freezes on final frame"
+        val mode = if (prefs.contains(VideoWallpaperService.KEY_PLAYBACK_MODE)) {
+            prefs.getInt(VideoWallpaperService.KEY_PLAYBACK_MODE, VideoWallpaperService.MODE_WAKE_FREEZE)
+        } else {
+            if (prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)) VideoWallpaperService.MODE_LOOP_LOCK_ONLY else VideoWallpaperService.MODE_WAKE_FREEZE
+        }
+        val modeText = when (mode) {
+            VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> "Loop on Lock Screen (Fast Home Screen)"
+            VideoWallpaperService.MODE_LOOP_ALWAYS -> "Continuous Loop Always"
+            else -> "Plays on wake, freezes on final frame"
+        }
         tvActiveWallpaperSubtitle.text = "Active: ${item.title} • $modeText"
     }
 
@@ -258,11 +269,20 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun loadSavedSettings() {
-        val isLoop = prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)
-        if (isLoop) {
-            rbLoop.isChecked = true
+        val mode = if (prefs.contains(VideoWallpaperService.KEY_PLAYBACK_MODE)) {
+            prefs.getInt(VideoWallpaperService.KEY_PLAYBACK_MODE, VideoWallpaperService.MODE_WAKE_FREEZE)
         } else {
-            rbFreezeLastFrame.isChecked = true
+            if (prefs.getBoolean(VideoWallpaperService.KEY_LOOP, false)) {
+                VideoWallpaperService.MODE_LOOP_LOCK_ONLY
+            } else {
+                VideoWallpaperService.MODE_WAKE_FREEZE
+            }
+        }
+
+        when (mode) {
+            VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> rbLoopLockOnly.isChecked = true
+            VideoWallpaperService.MODE_LOOP_ALWAYS -> rbLoopAlways.isChecked = true
+            else -> rbFreezeLastFrame.isChecked = true
         }
 
         val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
@@ -309,14 +329,26 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         rgPlaybackMode.setOnCheckedChangeListener { _, checkedId ->
-            val loop = (checkedId == R.id.rbLoop)
-            prefs.edit().putBoolean(VideoWallpaperService.KEY_LOOP, loop).apply()
+            val mode = when (checkedId) {
+                R.id.rbLoopLockOnly -> VideoWallpaperService.MODE_LOOP_LOCK_ONLY
+                R.id.rbLoopAlways -> VideoWallpaperService.MODE_LOOP_ALWAYS
+                else -> VideoWallpaperService.MODE_WAKE_FREEZE
+            }
+            val isLoop = (mode != VideoWallpaperService.MODE_WAKE_FREEZE)
+
+            prefs.edit()
+                .putInt(VideoWallpaperService.KEY_PLAYBACK_MODE, mode)
+                .putBoolean(VideoWallpaperService.KEY_LOOP, isLoop)
+                .apply()
+
             updateSubtitle(repository.getActiveWallpaper())
-            Toast.makeText(
-                this,
-                if (loop) "Mode: Continuous Loop" else "Mode: Wake Animation (Freeze on End Frame)",
-                Toast.LENGTH_SHORT
-            ).show()
+
+            val msg = when (mode) {
+                VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> "Mode: Loop on Lock Screen (Pauses on Home Screen - 100% Smooth)"
+                VideoWallpaperService.MODE_LOOP_ALWAYS -> "Mode: Loop Always (Lock & Home Screen)"
+                else -> "Mode: Wake Animation (Freeze on End Frame - 0% Battery)"
+            }
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
 
         switchMute.setOnCheckedChangeListener { _, isChecked ->

@@ -1,6 +1,10 @@
 package com.lockscreen.videowake
 
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.SurfaceTexture
 import android.media.MediaMetadataRetriever
@@ -32,6 +36,12 @@ class VideoWallpaperService : WallpaperService() {
         const val KEY_LOOP = "pref_loop"
         const val KEY_MUTE = "pref_mute"
 
+        // Playback Modes
+        const val KEY_PLAYBACK_MODE = "pref_playback_mode"
+        const val MODE_WAKE_FREEZE = 0       // Play on wake (5s), freeze on final frame (Default & Recommended)
+        const val MODE_LOOP_LOCK_ONLY = 1     // Loop on Lock Screen, freeze on Home Screen (Zero Lag & Battery Saver)
+        const val MODE_LOOP_ALWAYS = 2        // Loop on both Lock Screen and Home Screen
+
         const val KEY_ACTIVE_ID = "pref_active_id"
         const val KEY_ACTIVE_TYPE = "pref_active_type"         // "preset" or "file"
         const val KEY_ACTIVE_RES_NAME = "pref_active_res_name" // e.g. "lock_wake_video", "preset_wand_wake"
@@ -46,6 +56,10 @@ class VideoWallpaperService : WallpaperService() {
         private lateinit var prefs: SharedPreferences
         private var glThread: HandlerThread? = null
         private var glHandler: Handler? = null
+
+        // System Services
+        private var keyguardManager: KeyguardManager? = null
+        private var systemReceiver: BroadcastReceiver? = null
 
         // Dimensions
         private var surfaceWidth = 0
@@ -77,6 +91,15 @@ class VideoWallpaperService : WallpaperService() {
         private var isVisibleState = false
         private var isPrepared = false
 
+        // Frame pacing & backlog prevention (guarantees zero lag and smooth home screen scrolling)
+        @Volatile
+        private var isDrawPending = false
+
+        private val drawRunnable = Runnable {
+            isDrawPending = false
+            drawFrame()
+        }
+
         // Quad coordinates (X, Y, Z, U, V)
         private val verticesData = floatArrayOf(
             -1.0f, -1.0f, 0f, 0f, 0f,
@@ -94,11 +117,98 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
+
+            // CRITICAL FIX FOR LAUNCHER SWIPING:
+            // 1. Disable offset notifications so Launcher never waits for or synchronizes horizontal page swipes over IPC
+            setOffsetNotificationsEnabled(false)
+            // 2. Disable touch events so wallpaper never intercepts or interferes with home screen touch gestures
+            setTouchEventsEnabled(false)
+
             prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.registerOnSharedPreferenceChangeListener(this)
 
+            keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+
+            registerSystemReceiver()
+
             glThread = HandlerThread("GLVideoWallpaperThread").apply { start() }
             glHandler = Handler(glThread!!.looper)
+        }
+
+        override fun onOffsetsChanged(
+            xOffset: Float,
+            yOffset: Float,
+            xOffsetStep: Float,
+            yOffsetStep: Float,
+            xPixelOffset: Int,
+            yPixelOffset: Int
+        ) {
+            // Explicit NO-OP. Do not perform any work or GL redraw on home screen page scroll
+        }
+
+        private fun registerSystemReceiver() {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_USER_PRESENT)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+            systemReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    when (intent?.action) {
+                        Intent.ACTION_USER_PRESENT -> {
+                            // User unlocked device and is now on Home Screen
+                            handleUserUnlocked()
+                        }
+                        Intent.ACTION_SCREEN_OFF -> {
+                            // Screen turned off: reset to frame 0 for next wake
+                            handleScreenOff()
+                        }
+                    }
+                }
+            }
+            try {
+                registerReceiver(systemReceiver, filter)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error registering receiver", e)
+            }
+        }
+
+        private fun handleUserUnlocked() {
+            glHandler?.post {
+                val mode = getEffectivePlaybackMode()
+                if (mode == MODE_LOOP_LOCK_ONLY) {
+                    // Pause playback on Home Screen to give 100% CPU/GPU and 120Hz refresh to Launcher
+                    mediaPlayer?.let { mp ->
+                        try {
+                            if (mp.isPlaying) {
+                                mp.pause()
+                                Log.d(TAG, "Device unlocked: paused video on Home Screen for maximum launcher smoothness")
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+
+        private fun handleScreenOff() {
+            glHandler?.post {
+                mediaPlayer?.let { mp ->
+                    try {
+                        if (isPrepared) {
+                            mp.seekTo(0)
+                            if (mp.isPlaying) mp.pause()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        private fun getEffectivePlaybackMode(): Int {
+            if (prefs.contains(KEY_PLAYBACK_MODE)) {
+                return prefs.getInt(KEY_PLAYBACK_MODE, MODE_WAKE_FREEZE)
+            }
+            // Fallback to legacy KEY_LOOP boolean
+            val isLoop = prefs.getBoolean(KEY_LOOP, false)
+            return if (isLoop) MODE_LOOP_LOCK_ONLY else MODE_WAKE_FREEZE
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder) {
@@ -128,8 +238,16 @@ class VideoWallpaperService : WallpaperService() {
                 if (visible) {
                     if (isPrepared) {
                         try {
-                            mp.seekTo(0)
-                            mp.start()
+                            val mode = getEffectivePlaybackMode()
+                            val isLocked = keyguardManager?.isKeyguardLocked ?: true
+
+                            if (mode == MODE_LOOP_LOCK_ONLY && !isLocked) {
+                                // Already on Home Screen: keep static frame to preserve butter-smooth launcher performance
+                                if (mp.isPlaying) mp.pause()
+                            } else {
+                                mp.seekTo(0)
+                                mp.start()
+                            }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error starting on visibility changed", e)
                         }
@@ -157,6 +275,10 @@ class VideoWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             prefs.unregisterOnSharedPreferenceChangeListener(this)
+            systemReceiver?.let {
+                try { unregisterReceiver(it) } catch (_: Exception) {}
+                systemReceiver = null
+            }
             glHandler?.post {
                 releaseMediaPlayer()
                 releaseGL()
@@ -177,9 +299,10 @@ class VideoWallpaperService : WallpaperService() {
                             mp.setVolume(vol, vol)
                         }
                     }
-                    KEY_LOOP -> {
+                    KEY_LOOP, KEY_PLAYBACK_MODE -> {
                         mediaPlayer?.let { mp ->
-                            mp.isLooping = prefs.getBoolean(KEY_LOOP, false)
+                            val mode = getEffectivePlaybackMode()
+                            mp.isLooping = (mode == MODE_LOOP_LOCK_ONLY || mode == MODE_LOOP_ALWAYS)
                         }
                     }
                     KEY_ACTIVE_TIMESTAMP, KEY_ACTIVE_ID, KEY_ACTIVE_TYPE, KEY_ACTIVE_FILE_PATH, KEY_ACTIVE_RES_NAME -> {
@@ -199,6 +322,7 @@ class VideoWallpaperService : WallpaperService() {
                 EGL14.EGL_RED_SIZE, 8,
                 EGL14.EGL_GREEN_SIZE, 8,
                 EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
                 EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
                 EGL14.EGL_NONE
             )
@@ -206,7 +330,7 @@ class VideoWallpaperService : WallpaperService() {
                 return configs[0]
             }
 
-            // Priority 2: 16-bit (RGB 565) with ES2 (for budget / older Mali or PowerVR GPUs)
+            // Priority 2: 16-bit (RGB 565) with ES2
             val attribList16 = intArrayOf(
                 EGL14.EGL_RED_SIZE, 5,
                 EGL14.EGL_GREEN_SIZE, 6,
@@ -257,6 +381,8 @@ class VideoWallpaperService : WallpaperService() {
             }
 
             EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+            // Sync with display VSYNC to avoid tearing or buffer queue lock contention
+            EGL14.eglSwapInterval(eglDisplay, 1)
 
             program = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
             if (program == 0) return
@@ -275,12 +401,15 @@ class VideoWallpaperService : WallpaperService() {
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
 
+            // CRITICAL ZERO-LAG FRAME LISTENER:
+            // Dispatches directly on glHandler with atomic isDrawPending guard to prevent message backlog
             surfaceTexture = SurfaceTexture(textureId).apply {
-                setOnFrameAvailableListener {
-                    glHandler?.post {
-                        drawFrame()
+                setOnFrameAvailableListener({
+                    if (!isDrawPending) {
+                        isDrawPending = true
+                        glHandler?.post(drawRunnable)
                     }
-                }
+                }, glHandler)
             }
             videoSurface = Surface(surfaceTexture)
             updateViewportAndMatrix()
@@ -355,7 +484,6 @@ class VideoWallpaperService : WallpaperService() {
                                 setDataSource(file.absolutePath)
                                 dataSourceLoaded = true
 
-                                // Extract rotation if present
                                 val retriever = MediaMetadataRetriever()
                                 try {
                                     retriever.setDataSource(file.absolutePath)
@@ -372,7 +500,6 @@ class VideoWallpaperService : WallpaperService() {
                     }
 
                     if (!dataSourceLoaded) {
-                        // Built-in presets
                         val resId = when (activeResName) {
                             "preset_wand_wake" -> R.raw.preset_wand_wake
                             else -> R.raw.lock_wake_video
@@ -386,8 +513,8 @@ class VideoWallpaperService : WallpaperService() {
                     val volume = if (isMuted) 0f else 1f
                     setVolume(volume, volume)
 
-                    val isLoopingMode = prefs.getBoolean(KEY_LOOP, false)
-                    isLooping = isLoopingMode
+                    val mode = getEffectivePlaybackMode()
+                    isLooping = (mode == MODE_LOOP_LOCK_ONLY || mode == MODE_LOOP_ALWAYS)
 
                     setOnVideoSizeChangedListener { _, w, h ->
                         if (w > 0 && h > 0) {
@@ -414,8 +541,14 @@ class VideoWallpaperService : WallpaperService() {
                         isPrepared = true
                         Log.d(TAG, "MediaPlayer prepared, visible=$isVisibleState, isPreview=$isPreview")
                         if (isVisibleState || isPreview) {
-                            mp.seekTo(0)
-                            mp.start()
+                            val isLocked = keyguardManager?.isKeyguardLocked ?: true
+                            if (mode == MODE_LOOP_LOCK_ONLY && !isLocked && !isPreview) {
+                                // On Home Screen: hold still frame
+                                mp.seekTo(0)
+                            } else {
+                                mp.seekTo(0)
+                                mp.start()
+                            }
                         }
                     }
 

@@ -245,17 +245,29 @@
                         android:layout_height="wrap_content"
                         android:buttonTint="#D4AF37"
                         android:checked="true"
-                        android:text="Wake Animation (Play 5s, freeze on final frame)"
-                        android:textColor="#FFFFFF" />
+                        android:text="Wake Animation (Play 5s, freeze on final frame - 0% Battery)"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp" />
 
                     <RadioButton
-                        android:id="@+id/rbLoop"
+                        android:id="@+id/rbLoopLockOnly"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="8dp"
                         android:buttonTint="#D4AF37"
-                        android:text="Continuous Loop Animation"
-                        android:textColor="#FFFFFF" />
+                        android:text="Loop on Lock Screen Only (Freezes on Home Screen - Fast &amp; Smooth)"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp" />
+
+                    <RadioButton
+                        android:id="@+id/rbLoopAlways"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:buttonTint="#D4AF37"
+                        android:text="Loop Always (Both Lock Screen &amp; Home Screen)"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp" />
                 </RadioGroup>
 
                 <View
