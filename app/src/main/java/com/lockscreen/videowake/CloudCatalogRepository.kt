@@ -22,7 +22,6 @@ class CloudCatalogRepository(
 
     companion object {
         private const val TAG = "CloudCatalogRepo"
-        private const val CACHE_FILE_NAME = "catalog_cache.json"
     }
 
     private val httpClient = OkHttpClient.Builder()
@@ -31,6 +30,12 @@ class CloudCatalogRepository(
         .build()
 
     suspend fun fetchCatalog(isAdminMode: Boolean = false): List<WallpaperItem> = withContext(Dispatchers.IO) {
+        // Clear any old legacy cache file if it exists
+        try {
+            val oldCache = File(context.filesDir, "catalog_cache.json")
+            if (oldCache.exists()) oldCache.delete()
+        } catch (_: Exception) {}
+
         val jsonString = fetchRemoteJsonOrFallback()
         parseCatalog(jsonString, isAdminMode)
     }
@@ -56,26 +61,18 @@ class CloudCatalogRepository(
                         val body = response.body?.string()
                         if (!body.isNullOrBlank()) {
                             Log.d(TAG, "Fetched live wallpapers.json from remote (${body.length} chars)")
-                            saveLocalCachedCatalog(body)
                             return body
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Remote catalog fetch failed (${e.message}), using bundled/cached catalog")
+            Log.w(TAG, "Remote catalog fetch failed (${e.message}), using bundled catalog")
         }
-        return getLocalCachedOrAssetCatalog()
+        return getAssetCatalog()
     }
 
-    private fun saveLocalCachedCatalog(json: String) {
-        try {
-            val file = File(context.filesDir, CACHE_FILE_NAME)
-            file.writeText(json)
-        } catch (_: Exception) {}
-    }
-
-    private fun getLocalCachedOrAssetCatalog(): String {
+    private fun getAssetCatalog(): String {
         return try {
             context.assets.open("wallpapers.json").bufferedReader().use { it.readText() }
         } catch (_: Exception) {
