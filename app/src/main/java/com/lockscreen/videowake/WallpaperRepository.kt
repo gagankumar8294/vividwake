@@ -31,6 +31,7 @@ class WallpaperRepository(private val context: Context) {
 
     private val wallpapersDir = File(context.filesDir, "wallpapers").apply { mkdirs() }
     private val thumbsDir = File(context.filesDir, "thumbs").apply { mkdirs() }
+    val downloadManager = VideoDownloadManager(context)
 
     fun getPresetWallpapers(): List<WallpaperItem> {
         return listOf(
@@ -87,9 +88,36 @@ class WallpaperRepository(private val context: Context) {
         return list
     }
 
+    fun getDownloadedCloudWallpapers(): List<WallpaperItem> {
+        val list = mutableListOf<WallpaperItem>()
+        try {
+            val cloudDir = downloadManager.cloudWallpapersDir
+            val files = cloudDir.listFiles { f -> f.extension.equals("mp4", ignoreCase = true) }
+            if (files != null) {
+                for (f in files) {
+                    val id = f.nameWithoutExtension.removePrefix("cloud_")
+                    list.add(
+                        WallpaperItem(
+                            id = "cloud_$id",
+                            title = id.replace("_", " ").capitalizeWords().take(22),
+                            isPreset = false,
+                            filePath = f.absolutePath,
+                            isCloud = true,
+                            isDownloaded = true
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading downloaded cloud wallpapers", e)
+        }
+        return list
+    }
+
     fun getAllWallpapers(): List<WallpaperItem> {
         val all = mutableListOf<WallpaperItem>()
         all.addAll(getPresetWallpapers())
+        all.addAll(getDownloadedCloudWallpapers())
         all.addAll(getCustomWallpapers())
         return all
     }
@@ -121,7 +149,6 @@ class WallpaperRepository(private val context: Context) {
             val timestamp = System.currentTimeMillis()
             val destVideoFile = File(wallpapersDir, "custom_$timestamp.mp4")
 
-            // 1. Copy video from Uri to app internal storage
             context.contentResolver.openInputStream(contentUri)?.use { input ->
                 FileOutputStream(destVideoFile).use { output ->
                     input.copyTo(output)
@@ -133,7 +160,6 @@ class WallpaperRepository(private val context: Context) {
                 return@withContext Result.failure(Exception("Video file is empty"))
             }
 
-            // 2. Extract metadata and thumbnail
             val retriever = MediaMetadataRetriever()
             var durationMs = 0L
             var width = 0
@@ -155,7 +181,6 @@ class WallpaperRepository(private val context: Context) {
                     height = h
                 }
 
-                // Extract a frame for thumbnail (at 1 second or middle)
                 val targetFrameTimeUs = if (durationMs > 2000) 1_000_000L else 0L
                 val frameBitmap = retriever.getFrameAtTime(targetFrameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     ?: retriever.frameAtTime
@@ -189,7 +214,6 @@ class WallpaperRepository(private val context: Context) {
                 height = height
             )
 
-            // Save to persistent list
             saveCustomWallpaper(newItem)
             Result.success(newItem)
         } catch (e: Exception) {
@@ -205,14 +229,16 @@ class WallpaperRepository(private val context: Context) {
     }
 
     fun deleteWallpaper(item: WallpaperItem): Boolean {
-        if (item.isPreset) return false // Presets cannot be deleted
+        if (item.isPreset) return false
 
-        // If this was active, switch back to default trio preset
         if (getActiveWallpaper().id == item.id) {
             setActiveWallpaper(getPresetWallpapers().first())
         }
 
-        // Delete video file and thumbnail file
+        if (item.isCloud) {
+            return downloadManager.deleteLocalDownload(item.cloudId.ifBlank { item.id })
+        }
+
         try {
             if (item.filePath.isNotEmpty()) File(item.filePath).delete()
             if (item.thumbPath.isNotEmpty()) File(item.thumbPath).delete()
@@ -265,4 +291,7 @@ class WallpaperRepository(private val context: Context) {
             null
         }
     }
+
+    private fun String.capitalizeWords(): String =
+        split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
 }

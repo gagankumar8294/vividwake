@@ -12,15 +12,36 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Title Section -->
-        <TextView
+        <!-- Title Section (Tap 5 times for Admin mode) -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Lock Screen Video Wallpaper"
-            android:textColor="#D4AF37"
-            android:textSize="26sp"
-            android:textStyle="bold"
-            android:fontFamily="serif" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvAppTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="serif"
+                android:text="Lock Screen Video"
+                android:textColor="#D4AF37"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <!-- User Auth / Admin Badge -->
+            <TextView
+                android:id="@+id/tvUserBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="#261E38"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="Guest User"
+                android:textColor="#B0A8C0"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tvActiveWallpaperSubtitle"
@@ -29,7 +50,7 @@
             android:layout_marginTop="4dp"
             android:text="Active: Hogwarts Trio • Plays on wake, then freezes on last frame"
             android:textColor="#B0A8C0"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
 
         <!-- Video Preview Card -->
         <com.google.android.material.card.MaterialCardView
@@ -67,25 +88,57 @@
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Wallpaper Gallery Section -->
+        <!-- Segmented Tab Switcher (My Gallery vs Explore Store) -->
         <LinearLayout
             android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:layout_marginTop="18dp"
+            android:background="#1A1528"
+            android:orientation="horizontal"
+            android:padding="3dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTabMyWallpapers"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="🎨 My Wallpapers"
+                android:textAllCaps="false"
+                android:textColor="#0E0B16"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                app:backgroundTint="#D4AF37"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTabExploreStore"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="🌐 Explore Store"
+                android:textAllCaps="false"
+                android:textColor="#B0A8C0"
+                android:textSize="13sp"
+                app:cornerRadius="8dp" />
+        </LinearLayout>
+
+        <!-- Container 1: My Wallpapers Section -->
+        <LinearLayout
+            android:id="@+id/layoutMyWallpapers"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:orientation="vertical">
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:visibility="visible">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🎨 Video Wallpaper Gallery"
-                android:textColor="#D4AF37"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
                 android:text="Tap any wallpaper to select. Live lock screen updates immediately."
                 android:textColor="#B0A8C0"
                 android:textSize="12sp" />
@@ -126,6 +179,64 @@
                 android:clipToPadding="false"
                 android:nestedScrollingEnabled="false"
                 android:orientation="horizontal"
+                android:overScrollMode="never" />
+        </LinearLayout>
+
+        <!-- Container 2: Explore Store Section -->
+        <LinearLayout
+            android:id="@+id/layoutExploreStore"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvStoreCatalogHeader"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Tap any card to stream preview. Download to set as wallpaper."
+                    android:textColor="#B0A8C0"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRefreshStore"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="🔄 Refresh"
+                    android:textAllCaps="false"
+                    android:textColor="#D4AF37"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Loading Store Indicator -->
+            <ProgressBar
+                android:id="@+id/pbStoreLoading"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginVertical="20dp"
+                android:indeterminateTint="#D4AF37"
+                android:visibility="gone" />
+
+            <!-- Store Vertical RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvStoreWallpapers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
                 android:overScrollMode="never" />
         </LinearLayout>
 

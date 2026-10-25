@@ -12,5 +12,17 @@ data class WallpaperItem(
     val thumbPath: String = "",
     val durationMs: Long = 0L,
     val width: Int = 0,
-    val height: Int = 0
+    val height: Int = 0,
+    // Cloud Store and Admin Metadata
+    val isCloud: Boolean = false,
+    val cloudId: String = "",
+    val videoUrl: String = "",
+    val thumbUrl: String = "",
+    val sizeBytes: Long = 0L,
+    val sizeDisplay: String = "",
+    val isDownloaded: Boolean = false,
+    val description: String = "",
+    val status: String = "published", // "published" | "hidden" | "draft"
+    val isFeatured: Boolean = false,
+    val isVipOnly: Boolean = false
 ) : Serializable

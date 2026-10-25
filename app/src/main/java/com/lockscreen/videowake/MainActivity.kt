@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.media.MediaMetadataRetriever
@@ -18,6 +19,7 @@ import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
@@ -43,13 +45,31 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
+    private lateinit var tvAppTitle: TextView
+    private lateinit var tvUserBadge: TextView
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
     private lateinit var tvActiveWallpaperSubtitle: TextView
     private lateinit var previewTextureView: TextureView
+
+    // Tabs & Containers
+    private lateinit var btnTabMyWallpapers: MaterialButton
+    private lateinit var btnTabExploreStore: MaterialButton
+    private lateinit var layoutMyWallpapers: LinearLayout
+    private lateinit var layoutExploreStore: LinearLayout
+
+    // My Gallery
     private lateinit var rvWallpapers: RecyclerView
     private lateinit var layoutImporting: LinearLayout
     private lateinit var tvImportingStatus: TextView
+
+    // Store Section
+    private lateinit var rvStoreWallpapers: RecyclerView
+    private lateinit var pbStoreLoading: ProgressBar
+    private lateinit var btnRefreshStore: MaterialButton
+    private lateinit var tvStoreCatalogHeader: TextView
+
+    // Action Buttons
     private lateinit var btnSetWallpaper: MaterialButton
     private lateinit var btnDirectGalleryHandOff: MaterialButton
     private lateinit var btnClearLockOverride: MaterialButton
@@ -63,6 +83,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var prefs: SharedPreferences
     private lateinit var repository: WallpaperRepository
     private lateinit var adapter: WallpaperAdapter
+    private lateinit var storeAdapter: StoreWallpaperAdapter
+    private lateinit var catalogRepo: CloudCatalogRepository
+    private lateinit var analytics: AnalyticsManager
 
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
@@ -72,6 +95,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var isSamsung = false
     private var isXiaomi = false
     private var isColorOS = false
+    private var isAdminMode = false
+    private var titleClickCount = 0
+    private var lastTitleClickTime = 0L
 
     // SAF Save Video to chosen folder
     private val saveVideoLauncher = registerForActivityResult(
@@ -100,14 +126,30 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         prefs = getSharedPreferences(VideoWallpaperService.PREFS_NAME, Context.MODE_PRIVATE)
         repository = WallpaperRepository(this)
+        catalogRepo = CloudCatalogRepository(this, repository.downloadManager)
+        analytics = AnalyticsManager.getInstance(this)
 
+        tvAppTitle = findViewById(R.id.tvAppTitle)
+        tvUserBadge = findViewById(R.id.tvUserBadge)
         tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
         tvActiveWallpaperSubtitle = findViewById(R.id.tvActiveWallpaperSubtitle)
         previewTextureView = findViewById(R.id.previewTextureView)
+
+        btnTabMyWallpapers = findViewById(R.id.btnTabMyWallpapers)
+        btnTabExploreStore = findViewById(R.id.btnTabExploreStore)
+        layoutMyWallpapers = findViewById(R.id.layoutMyWallpapers)
+        layoutExploreStore = findViewById(R.id.layoutExploreStore)
+
         rvWallpapers = findViewById(R.id.rvWallpapers)
         layoutImporting = findViewById(R.id.layoutImporting)
         tvImportingStatus = findViewById(R.id.tvImportingStatus)
+
+        rvStoreWallpapers = findViewById(R.id.rvStoreWallpapers)
+        pbStoreLoading = findViewById(R.id.pbStoreLoading)
+        btnRefreshStore = findViewById(R.id.btnRefreshStore)
+        tvStoreCatalogHeader = findViewById(R.id.tvStoreCatalogHeader)
+
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
         btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
         btnClearLockOverride = findViewById(R.id.btnClearLockOverride)
@@ -122,8 +164,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         detectDeviceBrand()
         setupGalleryRecyclerView()
+        setupStoreRecyclerView()
         loadSavedSettings()
+        setupTabSwitching()
         setupListeners()
+        setupAdminSecretGesture()
+
+        // Check if opened from notification
+        if (intent?.getStringExtra("open_tab") == "store") {
+            switchToStoreTab()
+        }
     }
 
     private fun detectDeviceBrand() {
@@ -163,6 +213,48 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private fun setupTabSwitching() {
+        btnTabMyWallpapers.setOnClickListener {
+            switchToMyWallpapersTab()
+        }
+
+        btnTabExploreStore.setOnClickListener {
+            switchToStoreTab()
+        }
+
+        btnRefreshStore.setOnClickListener {
+            loadStoreCatalog()
+        }
+    }
+
+    private fun switchToMyWallpapersTab() {
+        layoutMyWallpapers.visibility = View.VISIBLE
+        layoutExploreStore.visibility = View.GONE
+
+        btnTabMyWallpapers.setBackgroundColor(Color.parseColor("#D4AF37"))
+        btnTabMyWallpapers.setTextColor(Color.parseColor("#0E0B16"))
+
+        btnTabExploreStore.setBackgroundColor(Color.TRANSPARENT)
+        btnTabExploreStore.setTextColor(Color.parseColor("#B0A8C0"))
+
+        analytics.logEvent("tab_switch", mapOf("tab" to "my_wallpapers"))
+        refreshGallery()
+    }
+
+    private fun switchToStoreTab() {
+        layoutMyWallpapers.visibility = View.GONE
+        layoutExploreStore.visibility = View.VISIBLE
+
+        btnTabExploreStore.setBackgroundColor(Color.parseColor("#D4AF37"))
+        btnTabExploreStore.setTextColor(Color.parseColor("#0E0B16"))
+
+        btnTabMyWallpapers.setBackgroundColor(Color.TRANSPARENT)
+        btnTabMyWallpapers.setTextColor(Color.parseColor("#B0A8C0"))
+
+        analytics.logEvent("tab_switch", mapOf("tab" to "explore_store"))
+        loadStoreCatalog()
+    }
+
     private fun setupGalleryRecyclerView() {
         adapter = WallpaperAdapter(
             context = this,
@@ -180,8 +272,162 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         rvWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         rvWallpapers.adapter = adapter
-
         refreshGallery()
+    }
+
+    private fun setupStoreRecyclerView() {
+        storeAdapter = StoreWallpaperAdapter(
+            context = this,
+            scope = lifecycleScope,
+            onPreview = { item ->
+                playStreamingVideoInPreview(item)
+            },
+            onDownload = { item ->
+                downloadCloudWallpaper(item)
+            },
+            onApply = { item ->
+                selectWallpaper(item)
+            },
+            onDeleteLocal = { item ->
+                confirmDeleteCloudDownload(item)
+            }
+        )
+
+        rvStoreWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        rvStoreWallpapers.adapter = storeAdapter
+    }
+
+    private fun loadStoreCatalog() {
+        pbStoreLoading.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            val list = catalogRepo.fetchCatalog(isAdminMode)
+            pbStoreLoading.visibility = View.GONE
+            storeAdapter.submitList(list)
+            if (isAdminMode) {
+                tvStoreCatalogHeader.text = "👑 ADMIN CATALOG (${list.size} wallpapers, drafts visible)"
+            } else {
+                tvStoreCatalogHeader.text = "Tap card to stream preview. Download to set as wallpaper."
+            }
+        }
+    }
+
+    private fun downloadCloudWallpaper(item: WallpaperItem) {
+        analytics.logEvent("download_start", mapOf("id" to item.id, "title" to item.title))
+        storeAdapter.setDownloadingProgress(item.id, 0)
+
+        lifecycleScope.launch {
+            val result = repository.downloadManager.downloadVideo(item) { progress ->
+                storeAdapter.setDownloadingProgress(item.id, progress)
+            }
+
+            result.onSuccess { downloadedFile ->
+                storeAdapter.setDownloadingProgress(item.id, 100)
+                val updated = item.copy(
+                    filePath = downloadedFile.absolutePath,
+                    isDownloaded = true
+                )
+                storeAdapter.updateItem(updated)
+                refreshGallery()
+                analytics.logEvent("download_success", mapOf("id" to item.id, "title" to item.title))
+                Toast.makeText(this@MainActivity, "✨ Downloaded '${item.title}'!", Toast.LENGTH_SHORT).show()
+            }.onFailure { err ->
+                storeAdapter.setDownloadingProgress(item.id, 100) // resets downloading state
+                Toast.makeText(this@MainActivity, "Download failed: ${err.message}", Toast.LENGTH_LONG).show()
+                analytics.logEvent("download_error", mapOf("id" to item.id, "error" to (err.message ?: "")))
+            }
+        }
+    }
+
+    private fun confirmDeleteCloudDownload(item: WallpaperItem) {
+        AlertDialog.Builder(this)
+            .setTitle("Free Phone Storage")
+            .setMessage("Delete '${item.title}' from your phone?\n\n(It will remain in the Cloud Store to download again anytime).")
+            .setPositiveButton("Free Storage") { _, _ ->
+                repository.downloadManager.deleteLocalDownload(item.id)
+                val updated = item.copy(filePath = "", isDownloaded = false)
+                storeAdapter.updateItem(updated)
+                refreshGallery()
+
+                val current = repository.getActiveWallpaper()
+                playActiveVideoInPreview(current)
+                analytics.logEvent("delete_local_storage", mapOf("id" to item.id))
+                Toast.makeText(this, "Local video deleted. Storage freed!", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun setupAdminSecretGesture() {
+        tvAppTitle.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (now - lastTitleClickTime < 1000) {
+                titleClickCount++
+            } else {
+                titleClickCount = 1
+            }
+            lastTitleClickTime = now
+
+            if (titleClickCount >= 5) {
+                titleClickCount = 0
+                showAdminPinDialog()
+            }
+        }
+
+        // Tap User badge to sign in / manage user
+        tvUserBadge.setOnClickListener {
+            showUserAuthDialog()
+        }
+    }
+
+    private fun showAdminPinDialog() {
+        val input = EditText(this).apply {
+            hint = "Enter Admin PIN"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("👑 Admin Secret Mode")
+            .setMessage("Enter Admin PIN to view unpublished/draft wallpapers:")
+            .setView(input)
+            .setPositiveButton("Unlock") { _, _ ->
+                val entered = input.text.toString().trim()
+                if (entered == CloudConfig.ADMIN_SECRET_PIN) {
+                    isAdminMode = !isAdminMode
+                    val modeText = if (isAdminMode) "👑 Admin Mode ENABLED" else "Guest Mode Restored"
+                    tvUserBadge.text = if (isAdminMode) "👑 Admin" else "Guest User"
+                    tvUserBadge.setBackgroundColor(if (isAdminMode) Color.parseColor("#B45309") else Color.parseColor("#261E38"))
+                    Toast.makeText(this, modeText, Toast.LENGTH_SHORT).show()
+                    loadStoreCatalog()
+                } else {
+                    Toast.makeText(this, "Incorrect Admin PIN", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showUserAuthDialog() {
+        val currentEmail = analytics.getUserEmail() ?: ""
+        val input = EditText(this).apply {
+            hint = "Enter your email (e.g. user@gmail.com)"
+            setText(currentEmail)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("👤 User Account")
+            .setMessage("Connect your account for personalized wallpapers & journey sync:")
+            .setView(input)
+            .setPositiveButton("Save Profile") { _, _ ->
+                val email = input.text.toString().trim()
+                if (email.isNotBlank() && email.contains("@")) {
+                    val uid = "user_" + email.substringBefore("@").replace(".", "_")
+                    analytics.linkUserToDevice(uid, email)
+                    tvUserBadge.text = "👤 ${email.substringBefore("@")}"
+                    Toast.makeText(this, "Profile connected: $email", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun refreshGallery() {
@@ -210,6 +456,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         adapter.setActiveId(item.id)
         updateSubtitle(item)
         playActiveVideoInPreview(item)
+        analytics.logEvent("apply_wallpaper", mapOf("id" to item.id, "title" to item.title))
         Toast.makeText(this, "Active lock screen set to: ${item.title}", Toast.LENGTH_SHORT).show()
     }
 
@@ -248,6 +495,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             result.onSuccess { newItem ->
                 refreshGallery()
                 selectWallpaper(newItem)
+                analytics.logEvent("local_video_imported", mapOf("title" to newItem.title))
                 Toast.makeText(this@MainActivity, "✨ Added '${newItem.title}' to gallery!", Toast.LENGTH_LONG).show()
             }.onFailure { err ->
                 Toast.makeText(this@MainActivity, "Failed to import video: ${err.message}", Toast.LENGTH_LONG).show()
@@ -287,6 +535,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
         switchMute.isChecked = isMute
+
+        val savedEmail = analytics.getUserEmail()
+        if (!savedEmail.isNullOrBlank()) {
+            tvUserBadge.text = "👤 ${savedEmail.substringBefore("@")}"
+        }
     }
 
     private fun setupListeners() {
@@ -342,6 +595,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .apply()
 
             updateSubtitle(repository.getActiveWallpaper())
+            analytics.logEvent("change_playback_mode", mapOf("mode" to mode))
 
             val msg = when (mode) {
                 VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> "Mode: Loop on Lock Screen (Pauses on Home Screen - 100% Smooth)"
@@ -446,11 +700,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 }
                 output.flush()
             }
-            Toast.makeText(
-                this,
-                "Video saved to chosen folder!",
-                Toast.LENGTH_LONG
-            ).show()
+            Toast.makeText(this, "Video saved to chosen folder!", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Toast.makeText(this, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
@@ -546,6 +796,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         previewTextureView.setTransform(matrix)
     }
 
+    /**
+     * Plays a local active wallpaper item in the top preview player.
+     */
     private fun playActiveVideoInPreview(item: WallpaperItem) {
         val surface = previewSurface ?: return
         try {
@@ -573,7 +826,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             try { retriever.release() } catch (_: Exception) {}
                         }
                     } else {
-                        // Fallback to preset
                         val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
                         setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
                         afd.close()
@@ -608,6 +860,51 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    /**
+     * Zero-disk live streaming preview:
+     * Streams video directly from remote URL over HTTP without saving full 15MB to disk.
+     */
+    private fun playStreamingVideoInPreview(item: WallpaperItem) {
+        val surface = previewSurface ?: return
+        if (item.videoUrl.isBlank()) return
+
+        try {
+            stopPreviewPlayback()
+            analytics.logEvent("preview_stream_start", mapOf("id" to item.id, "title" to item.title))
+            Toast.makeText(this, "Streaming '${item.title}' preview...", Toast.LENGTH_SHORT).show()
+
+            previewPlayer = MediaPlayer().apply {
+                setSurface(surface)
+                setDataSource(this@MainActivity, Uri.parse(item.videoUrl))
+                isLooping = true
+                val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
+                val vol = if (isMute) 0f else 1f
+                setVolume(vol, vol)
+
+                setOnVideoSizeChangedListener { _, w, h ->
+                    if (w > 0 && h > 0) {
+                        adjustPreviewAspect(w, h, 0)
+                    }
+                }
+
+                setOnPreparedListener { mp ->
+                    adjustPreviewAspect(mp.videoWidth, mp.videoHeight, 0)
+                    mp.start()
+                }
+
+                setOnErrorListener { _, what, extra ->
+                    Log.w("MainActivity", "Streaming error ($what, $extra), falling back to active")
+                    playActiveVideoInPreview(repository.getActiveWallpaper())
+                    true
+                }
+
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error streaming preview", e)
+        }
+    }
+
     private fun stopPreviewPlayback() {
         try {
             previewPlayer?.let {
@@ -630,11 +927,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onPause() {
         stopPreviewPlayback()
+        analytics.flushSync()
         super.onPause()
     }
 
     override fun onDestroy() {
         stopPreviewPlayback()
+        analytics.flushSync()
         super.onDestroy()
     }
 }
