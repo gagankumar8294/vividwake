@@ -17,11 +17,14 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
- * AnalyticsManager — Native telemetry & SessionFlow journey engine.
+ * AnalyticsManager — Native Application Performance Monitoring (APM) & Real-time Telemetry.
  *
- * Captures user navigation, preview dwell times, download speeds, and conversions.
- * Batches events in memory and syncs to backend /api/analytics/sync endpoint
- * without impacting battery or main-thread performance.
+ * Tracks every user action:
+ * - Device brand, model, OS version, RAM
+ * - Action name, target, and status (SUCCESS / FAILED)
+ * - Exact duration (in ms and seconds) for every operation
+ * - Full error payload (error type, message, stack trace)
+ * - Flushes to backend in real-time
  */
 class AnalyticsManager private constructor(private val context: Context) {
 
@@ -58,7 +61,14 @@ class AnalyticsManager private constructor(private val context: Context) {
         .build()
 
     init {
-        logEvent("app_open", mapOf("cold_start" to true))
+        logEvent("app_open", mapOf(
+            "cold_start" to true,
+            "status" to "SUCCESS",
+            "deviceBrand" to Build.MANUFACTURER,
+            "deviceModel" to Build.MODEL,
+            "osVersion" to "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+        ))
+        flushSync()
     }
 
     private fun getOrCreateDeviceId(): String {
@@ -78,7 +88,8 @@ class AnalyticsManager private constructor(private val context: Context) {
 
         logEvent("user_linked", mapOf(
             "user_id" to userId,
-            "email" to email
+            "email" to email,
+            "status" to "SUCCESS"
         ))
         flushSync()
     }
@@ -93,19 +104,92 @@ class AnalyticsManager private constructor(private val context: Context) {
                 put("type", eventType)
                 put("timestamp", System.currentTimeMillis())
                 put("elapsedSessionMs", System.currentTimeMillis() - sessionStartTime)
+                put("deviceModel", Build.MODEL)
+                put("deviceBrand", Build.MANUFACTURER)
                 for ((k, v) in properties) {
                     put(k, v)
                 }
             }
             eventQueue.add(eventObj)
-            Log.d(TAG, "Logged event: $eventType")
+            Log.d(TAG, "APM Event: $eventType [${properties["status"] ?: "INFO"}]")
 
-            // Flush automatically if queue has accumulated 8 events
-            if (eventQueue.size >= 8) {
+            // Auto-flush if 4+ events accumulated
+            if (eventQueue.size >= 4) {
                 flushSync()
             }
         } catch (e: Exception) {
             Log.w(TAG, "Error logging event $eventType", e)
+        }
+    }
+
+    /**
+     * Log a completed action with explicit status, duration, and error details
+     */
+    fun logAction(
+        actionName: String,
+        status: String, // "SUCCESS" or "FAILED"
+        durationMs: Long,
+        details: Map<String, Any> = emptyMap(),
+        error: Throwable? = null
+    ) {
+        val params = mutableMapOf<String, Any>(
+            "action" to actionName,
+            "status" to status,
+            "durationMs" to durationMs,
+            "durationSec" to String.format("%.2fs", durationMs / 1000.0)
+        )
+        if (error != null) {
+            params["errorType"] = error.javaClass.simpleName
+            params["errorMessage"] = error.message ?: "Unknown error"
+        }
+        params.putAll(details)
+        logEvent(actionName, params)
+
+        // Always flush failures immediately so Admin gets real-time crash/error alerts
+        if (status == "FAILED") {
+            flushSync()
+        }
+    }
+
+    /**
+     * Measure synchronous block duration and report status & latency
+     */
+    inline fun <T> traceAction(
+        actionName: String,
+        extraParams: Map<String, Any> = emptyMap(),
+        block: () -> T
+    ): T {
+        val start = System.currentTimeMillis()
+        return try {
+            val result = block()
+            val durationMs = System.currentTimeMillis() - start
+            logAction(actionName, "SUCCESS", durationMs, extraParams)
+            result
+        } catch (e: Throwable) {
+            val durationMs = System.currentTimeMillis() - start
+            logAction(actionName, "FAILED", durationMs, extraParams, e)
+            throw e
+        }
+    }
+
+    /**
+     * Measure suspend coroutine block duration and report status & latency
+     */
+    suspend fun <T> traceSuspendAction(
+        actionName: String,
+        extraParams: Map<String, Any> = emptyMap(),
+        block: suspend () -> T
+    ): T {
+        val start = System.currentTimeMillis()
+        return try {
+            val result = block()
+            val durationMs = System.currentTimeMillis() - start
+            logAction(actionName, "SUCCESS", durationMs, extraParams)
+            result
+        } catch (e: Throwable) {
+            val durationMs = System.currentTimeMillis() - start
+            logAction(actionName, "FAILED", durationMs, extraParams, e)
+            throw e
         }
     }
 
@@ -150,13 +234,12 @@ class AnalyticsManager private constructor(private val context: Context) {
 
                 httpClient.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        Log.d(TAG, "Successfully synced ${batch.size} telemetry events to backend")
+                        Log.d(TAG, "Synced ${batch.size} APM events to backend")
                     } else {
-                        Log.d(TAG, "Backend returned HTTP ${response.code} (endpoint ready for live config)")
+                        Log.d(TAG, "Backend sync HTTP ${response.code}")
                     }
                 }
             } catch (e: Exception) {
-                // Non-blocking catch — telemetry should never disturb user flow
                 Log.d(TAG, "Analytics sync deferred: ${e.message}")
             }
         }

@@ -69,6 +69,7 @@ class CloudCatalogRepository(
                 val obj = jsonArray.getJSONObject(i)
                 val id = obj.optString("id", "cloud_wp_$i")
                 val title = obj.optString("title", "Cloud Wallpaper")
+                val category = obj.optString("category", "General")
                 val description = obj.optString("description", "")
                 val status = obj.optString("status", "published")
                 val isFeatured = obj.optBoolean("isFeatured", false)
@@ -110,7 +111,8 @@ class CloudCatalogRepository(
                         description = description,
                         status = status,
                         isFeatured = isFeatured,
-                        isVipOnly = isVipOnly
+                        isVipOnly = isVipOnly,
+                        category = category
                     )
                 )
             }

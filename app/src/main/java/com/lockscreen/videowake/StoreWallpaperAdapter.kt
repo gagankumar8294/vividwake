@@ -1,7 +1,11 @@
 package com.lockscreen.videowake
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
+import android.util.Log
+import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,11 +21,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.net.URL
 
 /**
- * StoreWallpaperAdapter — RecyclerView Adapter for the Explore Store catalog.
- * Supports live streaming preview taps, download progress, and local deletion.
+ * StoreWallpaperAdapter — Dynamic multi-category catalog adapter for the Explore Store.
+ * Supports:
+ * - Dynamic category section headers with count badges
+ * - Unique per-video thumbnail extraction with 2-tier caching (LruCache in RAM + disk)
+ * - Material vector button icons
+ * - Live streaming preview taps & background download progress
  */
 class StoreWallpaperAdapter(
     private val context: Context,
@@ -30,14 +39,42 @@ class StoreWallpaperAdapter(
     private val onDownload: (WallpaperItem) -> Unit,
     private val onApply: (WallpaperItem) -> Unit,
     private val onDeleteLocal: (WallpaperItem) -> Unit
-) : RecyclerView.Adapter<StoreWallpaperAdapter.StoreViewHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val items = mutableListOf<WallpaperItem>()
+    companion object {
+        private const val TAG = "StoreWallpaperAdapter"
+        private const val VIEW_TYPE_HEADER = 0
+        private const val VIEW_TYPE_ITEM = 1
+
+        private val memoryCache: LruCache<String, Bitmap> = run {
+            val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+            val cacheSize = maxMemory / 8
+            object : LruCache<String, Bitmap>(cacheSize) {
+                override fun sizeOf(key: String, bitmap: Bitmap): Int {
+                    return bitmap.byteCount / 1024
+                }
+            }
+        }
+    }
+
+    sealed class StoreRow {
+        data class Header(val categoryName: String, val count: Int) : StoreRow()
+        data class Item(val item: WallpaperItem) : StoreRow()
+    }
+
+    private val rows = mutableListOf<StoreRow>()
     private val downloadingProgressMap = mutableMapOf<String, Int>()
 
-    fun submitList(newItems: List<WallpaperItem>) {
-        items.clear()
-        items.addAll(newItems)
+    fun submitList(catalogItems: List<WallpaperItem>) {
+        rows.clear()
+        // Group by category dynamically based on JSON records
+        val grouped = catalogItems.groupBy { it.category.ifBlank { "General" } }
+        grouped.forEach { (catName, itemsInCat) ->
+            rows.add(StoreRow.Header(catName, itemsInCat.size))
+            itemsInCat.forEach { item ->
+                rows.add(StoreRow.Item(item))
+            }
+        }
         notifyDataSetChanged()
     }
 
@@ -47,37 +84,62 @@ class StoreWallpaperAdapter(
         } else {
             downloadingProgressMap[itemId] = progress
         }
-        val idx = items.indexOfFirst { it.id == itemId }
+        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
         if (idx != -1) {
             notifyItemChanged(idx, progress)
         }
     }
 
     fun updateItem(updated: WallpaperItem) {
-        val idx = items.indexOfFirst { it.id == updated.id }
+        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == updated.id }
         if (idx != -1) {
-            items[idx] = updated
+            rows[idx] = StoreRow.Item(updated)
             notifyItemChanged(idx)
         }
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun getItemCount(): Int = rows.size
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StoreViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_store_wallpaper, parent, false)
-        return StoreViewHolder(view)
+    override fun getItemViewType(position: Int): Int {
+        return when (rows[position]) {
+            is StoreRow.Header -> VIEW_TYPE_HEADER
+            is StoreRow.Item -> VIEW_TYPE_ITEM
+        }
     }
 
-    override fun onBindViewHolder(holder: StoreViewHolder, position: Int) {
-        holder.bind(items[position])
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == VIEW_TYPE_HEADER) {
+            val view = inflater.inflate(R.layout.item_store_category_header, parent, false)
+            CategoryHeaderViewHolder(view)
+        } else {
+            val view = inflater.inflate(R.layout.item_store_wallpaper, parent, false)
+            StoreViewHolder(view)
+        }
     }
 
-    override fun onBindViewHolder(holder: StoreViewHolder, position: Int, payloads: List<Any>) {
-        if (payloads.isNotEmpty() && payloads[0] is Int) {
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val row = rows[position]) {
+            is StoreRow.Header -> (holder as CategoryHeaderViewHolder).bind(row.categoryName, row.count)
+            is StoreRow.Item -> (holder as StoreViewHolder).bind(row.item)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: List<Any>) {
+        if (holder is StoreViewHolder && payloads.isNotEmpty() && payloads[0] is Int) {
             holder.updateProgressOnly(payloads[0] as Int)
         } else {
-            holder.bind(items[position])
+            onBindViewHolder(holder, position)
+        }
+    }
+
+    inner class CategoryHeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvTitle: TextView = itemView.findViewById(R.id.tvCategoryTitle)
+        private val tvCount: TextView = itemView.findViewById(R.id.tvCategoryCount)
+
+        fun bind(title: String, count: Int) {
+            tvTitle.text = title
+            tvCount.text = if (count == 1) "1 Wallpaper" else "$count Wallpapers"
         }
     }
 
@@ -97,6 +159,7 @@ class StoreWallpaperAdapter(
         private val btnDeleteLocal: MaterialButton = itemView.findViewById(R.id.btnStoreDeleteLocal)
 
         private var thumbJob: Job? = null
+        private val analytics = AnalyticsManager.getInstance(context)
 
         fun bind(item: WallpaperItem) {
             tvTitle.text = item.title
@@ -129,12 +192,12 @@ class StoreWallpaperAdapter(
                 pbDownload.visibility = View.GONE
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.VISIBLE
-                btnDownload.text = if (item.sizeDisplay.isNotBlank()) "⬇ Download (${item.sizeDisplay})" else "⬇ Download"
+                btnDownload.text = if (item.sizeDisplay.isNotBlank()) "Download (${item.sizeDisplay})" else "Download"
                 btnApply.visibility = View.GONE
                 btnDeleteLocal.visibility = View.GONE
             }
 
-            // Click on the entire card to trigger live preview streaming
+            // Click card to stream live preview
             card.setOnClickListener {
                 onPreview(item)
             }
@@ -166,25 +229,115 @@ class StoreWallpaperAdapter(
 
         private fun loadThumbnail(item: WallpaperItem) {
             thumbJob?.cancel()
+
+            // 1. Check in-memory LruCache
+            val cachedMem = memoryCache.get(item.id)
+            if (cachedMem != null) {
+                ivThumb.setImageBitmap(cachedMem)
+                return
+            }
+
+            // Fallback placeholder while loading
             ivThumb.setImageResource(R.drawable.wallpaper_thumb)
+
+            val thumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS).apply { mkdirs() }
+            val cacheFile = File(thumbsDir, "thumb_${item.id}.jpg")
+            val start = System.currentTimeMillis()
 
             thumbJob = scope.launch {
                 val bitmap = withContext(Dispatchers.IO) {
+                    // 2. Check disk cache
+                    if (cacheFile.exists() && cacheFile.length() > 0) {
+                        try {
+                            val decoded = BitmapFactory.decodeFile(cacheFile.absolutePath)
+                            if (decoded != null) return@withContext decoded
+                        } catch (_: Exception) {}
+                    }
+
+                    // 3. Download from thumbUrl if provided
                     if (item.thumbUrl.isNotBlank()) {
                         try {
                             val conn = URL(item.thumbUrl).openConnection().apply {
-                                connectTimeout = 6000
-                                readTimeout = 6000
+                                connectTimeout = 5000
+                                readTimeout = 5000
                             }
-                            conn.getInputStream().use { stream ->
+                            val downloaded = conn.getInputStream().use { stream ->
                                 BitmapFactory.decodeStream(stream)
                             }
-                        } catch (_: Exception) { null }
-                    } else null
+                            if (downloaded != null) {
+                                saveBitmapToFile(downloaded, cacheFile)
+                                return@withContext downloaded
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    // 4. Extract frame from local video if already downloaded
+                    val localVideo = File(context.filesDir, "${CloudConfig.FOLDER_CLOUD_WALLPAPERS}/${item.id}.mp4")
+                    if (localVideo.exists() && localVideo.length() > 0) {
+                        val frame = extractFrameFromFile(localVideo)
+                        if (frame != null) {
+                            saveBitmapToFile(frame, cacheFile)
+                            return@withContext frame
+                        }
+                    }
+
+                    // 5. Extract frame directly from remote videoUrl
+                    if (item.videoUrl.isNotBlank()) {
+                        val frame = extractFrameFromUrl(item.videoUrl)
+                        if (frame != null) {
+                            saveBitmapToFile(frame, cacheFile)
+                            return@withContext frame
+                        }
+                    }
+
+                    null
                 }
+
                 if (bitmap != null) {
+                    memoryCache.put(item.id, bitmap)
                     ivThumb.setImageBitmap(bitmap)
+                    val duration = System.currentTimeMillis() - start
+                    analytics.logAction("thumbnail_ready", "SUCCESS", duration, mapOf(
+                        "id" to item.id,
+                        "title" to item.title
+                    ))
                 }
+            }
+        }
+
+        private fun extractFrameFromFile(file: File): Bitmap? {
+            val retriever = MediaMetadataRetriever()
+            return try {
+                retriever.setDataSource(file.absolutePath)
+                retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            } catch (e: Exception) {
+                Log.w(TAG, "File frame extraction failed: ${e.message}")
+                null
+            } finally {
+                try { retriever.release() } catch (_: Exception) {}
+            }
+        }
+
+        private fun extractFrameFromUrl(url: String): Bitmap? {
+            val retriever = MediaMetadataRetriever()
+            return try {
+                retriever.setDataSource(url, HashMap<String, String>())
+                retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            } catch (e: Exception) {
+                Log.w(TAG, "Remote frame extraction failed for $url: ${e.message}")
+                null
+            } finally {
+                try { retriever.release() } catch (_: Exception) {}
+            }
+        }
+
+        private fun saveBitmapToFile(bitmap: Bitmap, file: File) {
+            try {
+                FileOutputStream(file).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed saving thumb cache: ${e.message}")
             }
         }
     }

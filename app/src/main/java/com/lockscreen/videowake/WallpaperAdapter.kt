@@ -47,6 +47,7 @@ class WallpaperAdapter(
 
     private val items = mutableListOf<WallpaperItem>()
     private var activeId: String = ""
+    var isAdminMode: Boolean = false
 
     fun submitList(newItems: List<WallpaperItem>, currentActiveId: String) {
         items.clear()
@@ -64,7 +65,7 @@ class WallpaperAdapter(
         if (newPos != -1) notifyItemChanged(newPos)
     }
 
-    override fun getItemCount(): Int = items.size + 1 // +1 for the "Add" card
+    override fun getItemCount(): Int = items.size + if (isAdminMode) 1 else 0
 
     override fun getItemViewType(position: Int): Int {
         return if (position < items.size) VIEW_TYPE_ITEM else VIEW_TYPE_ADD

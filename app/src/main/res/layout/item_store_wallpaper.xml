@@ -168,13 +168,15 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="⬇ Download"
+                    android:text="Download"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     app:backgroundTint="#D4AF37"
-                    app:cornerRadius="8dp" />
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_download"
+                    app:iconTint="#0E0B16" />
 
                 <!-- Apply Button (Only when downloaded) -->
                 <com.google.android.material.button.MaterialButton
@@ -184,13 +186,15 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="✨ Apply"
+                    android:text="Apply"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     app:backgroundTint="#22C55E"
                     app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_sparkle"
+                    app:iconTint="#0E0B16"
                     android:visibility="gone" />
 
                 <!-- Delete Local Download Button (Frees phone storage) -->
@@ -204,10 +208,11 @@
                     android:insetBottom="0dp"
                     android:minWidth="0dp"
                     android:padding="0dp"
-                    android:text="🗑"
-                    android:textColor="#EF4444"
-                    android:textSize="14sp"
                     app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_delete"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconTint="#EF4444"
                     app:strokeColor="#EF4444"
                     android:visibility="gone" />
 

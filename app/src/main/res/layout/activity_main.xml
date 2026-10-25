@@ -104,13 +104,15 @@
                 android:layout_weight="1"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="🎨 My Wallpapers"
+                android:text="My Wallpapers"
                 android:textAllCaps="false"
                 android:textColor="#0E0B16"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 app:backgroundTint="#D4AF37"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                app:icon="@drawable/ic_gallery"
+                app:iconTint="#0E0B16" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnTabExploreStore"
@@ -120,11 +122,13 @@
                 android:layout_weight="1"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="🌐 Explore Store"
+                android:text="Explore Store"
                 android:textAllCaps="false"
                 android:textColor="#B0A8C0"
                 android:textSize="13sp"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="8dp"
+                app:icon="@drawable/ic_store"
+                app:iconTint="#B0A8C0" />
         </LinearLayout>
 
         <!-- Container 1: My Wallpapers Section -->
@@ -213,21 +217,24 @@
                     android:layout_height="36dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="🔄 Refresh"
+                    android:text="Refresh"
                     android:textAllCaps="false"
                     android:textColor="#D4AF37"
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <!-- Loading Store Indicator -->
-            <ProgressBar
-                android:id="@+id/pbStoreLoading"
-                android:layout_width="wrap_content"
+            <!-- Skeleton Loading Container -->
+            <LinearLayout
+                android:id="@+id/layoutStoreSkeleton"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginVertical="20dp"
-                android:indeterminateTint="#D4AF37"
-                android:visibility="gone" />
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <include layout="@layout/item_store_skeleton" />
+                <include layout="@layout/item_store_skeleton" />
+            </LinearLayout>
 
             <!-- Store Vertical RecyclerView -->
             <androidx.recyclerview.widget.RecyclerView
