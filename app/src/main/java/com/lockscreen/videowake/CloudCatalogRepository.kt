@@ -76,13 +76,6 @@ class CloudCatalogRepository(
     }
 
     private fun getLocalCachedOrAssetCatalog(): String {
-        try {
-            val file = File(context.filesDir, CACHE_FILE_NAME)
-            if (file.exists() && file.length() > 0) {
-                return file.readText()
-            }
-        } catch (_: Exception) {}
-
         return try {
             context.assets.open("wallpapers.json").bufferedReader().use { it.readText() }
         } catch (_: Exception) {
