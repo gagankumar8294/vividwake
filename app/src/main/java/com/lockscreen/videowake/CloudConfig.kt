@@ -19,7 +19,7 @@ object CloudConfig {
      * Base URL for the SessionFlow Analytics Ingestion endpoint.
      * Android app will POST telemetry batches to: "$ANALYTICS_BASE_URL/api/analytics/sync"
      */
-    var ANALYTICS_BASE_URL: String = "https://api.yourdomain.com"
+    var ANALYTICS_BASE_URL: String = "https://vividwake-backend.onrender.com"
 
     /**
      * Default Admin Passcode to unlock Hidden/Draft wallpapers directly in the app.

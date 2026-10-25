@@ -144,6 +144,7 @@ class AnalyticsManager private constructor(private val context: Context) {
                 val request = Request.Builder()
                     .url(syncUrl)
                     .header("User-Agent", "VideoLockScreen-Telemetry")
+                    .header("x-app-auth", "vividwake_secure_app_key_2026")
                     .post(body)
                     .build()
 
