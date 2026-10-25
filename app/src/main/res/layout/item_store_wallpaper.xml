@@ -27,10 +27,9 @@
                 android:id="@+id/ivStoreThumb"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#0E0B16"
+                android:background="#1C162E"
                 android:contentDescription="Wallpaper Thumbnail"
-                android:scaleType="centerCrop"
-                android:src="@drawable/wallpaper_thumb" />
+                android:scaleType="centerCrop" />
 
             <!-- Featured Badge -->
             <TextView

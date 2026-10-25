@@ -230,36 +230,28 @@ class StoreWallpaperAdapter(
         private fun loadThumbnail(item: WallpaperItem) {
             thumbJob?.cancel()
 
-            // 1. Check in-memory LruCache
-            val cachedMem = memoryCache.get(item.id)
-            if (cachedMem != null) {
-                ivThumb.setImageBitmap(cachedMem)
-                return
-            }
+            // If item has a custom thumbUrl provided, load that lightweight image
+            if (item.thumbUrl.isNotBlank()) {
+                val cachedMem = memoryCache.get(item.id)
+                if (cachedMem != null) {
+                    ivThumb.setImageBitmap(cachedMem)
+                    return
+                }
 
-            // Fallback placeholder while loading
-            ivThumb.setImageResource(R.drawable.wallpaper_thumb)
+                val thumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS).apply { mkdirs() }
+                val cacheFile = File(thumbsDir, "thumb_${item.id}.jpg")
 
-            val thumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS).apply { mkdirs() }
-            val cacheFile = File(thumbsDir, "thumb_${item.id}.jpg")
-            val start = System.currentTimeMillis()
-
-            thumbJob = scope.launch {
-                val bitmap = withContext(Dispatchers.IO) {
-                    // 2. Check disk cache
-                    if (cacheFile.exists() && cacheFile.length() > 0) {
-                        try {
-                            val decoded = BitmapFactory.decodeFile(cacheFile.absolutePath)
-                            if (decoded != null) return@withContext decoded
-                        } catch (_: Exception) {}
-                    }
-
-                    // 3. Download from thumbUrl if provided
-                    if (item.thumbUrl.isNotBlank()) {
+                thumbJob = scope.launch {
+                    val bitmap = withContext(Dispatchers.IO) {
+                        if (cacheFile.exists() && cacheFile.length() > 0) {
+                            try {
+                                return@withContext BitmapFactory.decodeFile(cacheFile.absolutePath)
+                            } catch (_: Exception) {}
+                        }
                         try {
                             val conn = URL(item.thumbUrl).openConnection().apply {
-                                connectTimeout = 5000
-                                readTimeout = 5000
+                                connectTimeout = 4000
+                                readTimeout = 4000
                             }
                             val downloaded = conn.getInputStream().use { stream ->
                                 BitmapFactory.decodeStream(stream)
@@ -269,65 +261,19 @@ class StoreWallpaperAdapter(
                                 return@withContext downloaded
                             }
                         } catch (_: Exception) {}
+                        null
                     }
 
-                    // 4. Extract frame from local video if already downloaded
-                    val localVideo = File(context.filesDir, "${CloudConfig.FOLDER_CLOUD_WALLPAPERS}/${item.id}.mp4")
-                    if (localVideo.exists() && localVideo.length() > 0) {
-                        val frame = extractFrameFromFile(localVideo)
-                        if (frame != null) {
-                            saveBitmapToFile(frame, cacheFile)
-                            return@withContext frame
-                        }
+                    if (bitmap != null) {
+                        memoryCache.put(item.id, bitmap)
+                        ivThumb.setImageBitmap(bitmap)
+                    } else {
+                        ivThumb.setImageDrawable(null)
                     }
-
-                    // 5. Extract frame directly from remote videoUrl
-                    if (item.videoUrl.isNotBlank()) {
-                        val frame = extractFrameFromUrl(item.videoUrl)
-                        if (frame != null) {
-                            saveBitmapToFile(frame, cacheFile)
-                            return@withContext frame
-                        }
-                    }
-
-                    null
                 }
-
-                if (bitmap != null) {
-                    memoryCache.put(item.id, bitmap)
-                    ivThumb.setImageBitmap(bitmap)
-                    val duration = System.currentTimeMillis() - start
-                    analytics.logAction("thumbnail_ready", "SUCCESS", duration, mapOf(
-                        "id" to item.id,
-                        "title" to item.title
-                    ))
-                }
-            }
-        }
-
-        private fun extractFrameFromFile(file: File): Bitmap? {
-            val retriever = MediaMetadataRetriever()
-            return try {
-                retriever.setDataSource(file.absolutePath)
-                retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            } catch (e: Exception) {
-                Log.w(TAG, "File frame extraction failed: ${e.message}")
-                null
-            } finally {
-                try { retriever.release() } catch (_: Exception) {}
-            }
-        }
-
-        private fun extractFrameFromUrl(url: String): Bitmap? {
-            val retriever = MediaMetadataRetriever()
-            return try {
-                retriever.setDataSource(url, HashMap<String, String>())
-                retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            } catch (e: Exception) {
-                Log.w(TAG, "Remote frame extraction failed for $url: ${e.message}")
-                null
-            } finally {
-                try { retriever.release() } catch (_: Exception) {}
+            } else {
+                // Keep the allocated frame space clean and empty as requested
+                ivThumb.setImageDrawable(null)
             }
         }
 

@@ -323,11 +323,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun loadStoreCatalog() {
         val start = System.currentTimeMillis()
+        val pulseAnim = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.pulse_skeleton)
         layoutStoreSkeleton.visibility = View.VISIBLE
+        layoutStoreSkeleton.startAnimation(pulseAnim)
         rvStoreWallpapers.visibility = View.GONE
         lifecycleScope.launch {
             try {
                 val list = catalogRepo.fetchCatalog(isAdminMode)
+                layoutStoreSkeleton.clearAnimation()
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
                 storeAdapter.submitList(list)
@@ -342,6 +345,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     "isAdminMode" to isAdminMode
                 ))
             } catch (e: Exception) {
+                layoutStoreSkeleton.clearAnimation()
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
                 val duration = System.currentTimeMillis() - start

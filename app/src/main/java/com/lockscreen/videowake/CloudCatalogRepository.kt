@@ -7,12 +7,13 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
-import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
  * CloudCatalogRepository — Fetches and parses the cloud wallpaper catalog.
- * Connects to CloudConfig.CATALOG_URL with seamless fallback to built-in presets.
+ * Connects to CloudConfig.CATALOG_URL (raw GitHub JSON) with cache-busting.
+ * Returns ONLY the real wallpapers defined in wallpapers.json.
  */
 class CloudCatalogRepository(
     private val context: Context,
@@ -21,17 +22,14 @@ class CloudCatalogRepository(
 
     companion object {
         private const val TAG = "CloudCatalogRepo"
+        private const val CACHE_FILE_NAME = "catalog_cache.json"
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
-    /**
-     * Fetch catalog from remote URL or fallback to local built-in JSON.
-     * @param isAdminMode If true, returns draft/hidden wallpapers with admin tags.
-     */
     suspend fun fetchCatalog(isAdminMode: Boolean = false): List<WallpaperItem> = withContext(Dispatchers.IO) {
         val jsonString = fetchRemoteJsonOrFallback()
         parseCatalog(jsonString, isAdminMode)
@@ -40,8 +38,16 @@ class CloudCatalogRepository(
     private fun fetchRemoteJsonOrFallback(): String {
         try {
             if (CloudConfig.CATALOG_URL.isNotBlank()) {
+                val urlWithBuster = if (CloudConfig.CATALOG_URL.contains("?")) {
+                    "${CloudConfig.CATALOG_URL}&_nocache=${System.currentTimeMillis()}"
+                } else {
+                    "${CloudConfig.CATALOG_URL}?_nocache=${System.currentTimeMillis()}"
+                }
                 val request = Request.Builder()
-                    .url(CloudConfig.CATALOG_URL)
+                    .url(urlWithBuster)
+                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                    .header("Pragma", "no-cache")
+                    .header("Expires", "0")
                     .header("User-Agent", "VideoLockScreen-Android")
                     .build()
 
@@ -49,16 +55,39 @@ class CloudCatalogRepository(
                     if (response.isSuccessful) {
                         val body = response.body?.string()
                         if (!body.isNullOrBlank()) {
-                            Log.d(TAG, "Successfully fetched catalog from remote: ${body.length} chars")
+                            Log.d(TAG, "Fetched live wallpapers.json from remote (${body.length} chars)")
+                            saveLocalCachedCatalog(body)
                             return body
                         }
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Remote catalog fetch failed (${e.message}), using fallback catalog")
+            Log.w(TAG, "Remote catalog fetch failed (${e.message}), using bundled/cached catalog")
         }
-        return CloudConfig.getBuiltinCatalogJson()
+        return getLocalCachedOrAssetCatalog()
+    }
+
+    private fun saveLocalCachedCatalog(json: String) {
+        try {
+            val file = File(context.filesDir, CACHE_FILE_NAME)
+            file.writeText(json)
+        } catch (_: Exception) {}
+    }
+
+    private fun getLocalCachedOrAssetCatalog(): String {
+        try {
+            val file = File(context.filesDir, CACHE_FILE_NAME)
+            if (file.exists() && file.length() > 0) {
+                return file.readText()
+            }
+        } catch (_: Exception) {}
+
+        return try {
+            context.assets.open("wallpapers.json").bufferedReader().use { it.readText() }
+        } catch (_: Exception) {
+            CloudConfig.getBuiltinCatalogJson()
+        }
     }
 
     private fun parseCatalog(jsonString: String, isAdminMode: Boolean): List<WallpaperItem> {
