@@ -1,0 +1,53 @@
+[
+  {
+    "id": "wp_hogwarts_trio",
+    "title": "Hogwarts Trio (Wake)",
+    "description": "Harry, Ron, and Hermione animated magic wand wake sequence.",
+    "status": "published",
+    "isFeatured": true,
+    "isVipOnly": false,
+    "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "thumbUrl": "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/app/src/main/res/drawable/wallpaper_thumb.png",
+    "sizeBytes": 15600000,
+    "sizeDisplay": "14.9 MB",
+    "durationMs": 15000,
+    "width": 1080,
+    "height": 1920,
+    "version": 1,
+    "addedAt": 1729850000000
+  },
+  {
+    "id": "wp_elder_wand",
+    "title": "Elder Wand Lumos",
+    "description": "High-speed spell casting animation with gold particle trailing.",
+    "status": "published",
+    "isFeatured": true,
+    "isVipOnly": false,
+    "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    "thumbUrl": "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/app/src/main/res/drawable/wallpaper_thumb.png",
+    "sizeBytes": 14900000,
+    "sizeDisplay": "14.2 MB",
+    "durationMs": 15000,
+    "width": 1080,
+    "height": 1920,
+    "version": 1,
+    "addedAt": 1729851000000
+  },
+  {
+    "id": "wp_cyberpunk_neon",
+    "title": "Neon Cyberpunk Rain (Draft)",
+    "description": "Futuristic neon city with rain animation and puddles.",
+    "status": "hidden",
+    "isFeatured": false,
+    "isVipOnly": false,
+    "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    "thumbUrl": "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/app/src/main/res/drawable/wallpaper_thumb.png",
+    "sizeBytes": 13800000,
+    "sizeDisplay": "13.1 MB",
+    "durationMs": 12000,
+    "width": 1080,
+    "height": 1920,
+    "version": 1,
+    "addedAt": 1729852000000
+  }
+]

@@ -13,7 +13,7 @@ object CloudConfig {
      * Remote URL for wallpapers.json.
      * Default points to a placeholder or raw GitHub repository URL.
      */
-    var CATALOG_URL: String = "https://raw.githubusercontent.com/videolockscreen/wallpapers-catalog/main/wallpapers.json"
+    var CATALOG_URL: String = "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/wallpapers.json"
 
     /**
      * Base URL for the SessionFlow Analytics Ingestion endpoint.
