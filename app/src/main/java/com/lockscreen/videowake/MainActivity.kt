@@ -17,10 +17,13 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.RadioButton
@@ -190,33 +193,68 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         when {
             isSamsung -> {
-                tvDeviceBrand.text = "📱 Detected: Samsung Galaxy (One UI)"
+                tvDeviceBrand.text = "Detected: Samsung Galaxy (One UI)"
                 tvPrimaryInstruction.text = "Opens Samsung One UI lock screen video setup directly"
             }
             isXiaomi -> {
-                tvDeviceBrand.text = "📱 Detected: Xiaomi / Redmi / Poco (HyperOS/MIUI)"
+                tvDeviceBrand.text = "Detected: Xiaomi / Redmi / Poco (HyperOS/MIUI)"
                 tvPrimaryInstruction.text = "Opens video player: tap '...' ➔ 'Set video wallpaper' ➔ 'Lock screen'"
             }
             isColorOS -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-                tvDeviceBrand.text = "📱 Detected: $brandName (OxygenOS / ColorOS)"
+                tvDeviceBrand.text = "Detected: $brandName (OxygenOS / ColorOS)"
                 tvPrimaryInstruction.text = "Select 'Home and Lock screen'. Note: turn off 'Lock Screen Magazine' if it reverts."
             }
             else -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-                tvDeviceBrand.text = "📱 Detected: $brandName (Native AOSP)"
+                tvDeviceBrand.text = "Detected: $brandName (Native AOSP)"
                 tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
             }
         }
-        updateApplyButtonText(repository.getActiveWallpaper())
+        setApplyButtonState(isDim = true, title = repository.getActiveWallpaper().title)
     }
 
-    private fun updateApplyButtonText(item: WallpaperItem) {
-        val title = item.title.ifBlank { "Wallpaper" }
-        when {
-            isSamsung -> btnSetWallpaper.text = "📱 Apply '$title' to Samsung Lock Screen"
-            isXiaomi -> btnSetWallpaper.text = "📱 Apply '$title' in Xiaomi Video Wallpaper"
-            else -> btnSetWallpaper.text = "📱 Apply '$title' to Lock Screen"
+    private fun setApplyButtonState(isDim: Boolean, title: String? = null) {
+        val wallpaperTitle = title ?: repository.getActiveWallpaper().title.ifBlank { "Wallpaper" }
+        val actionText = when {
+            isSamsung -> "Apply '$wallpaperTitle' to Samsung Lock Screen"
+            isXiaomi -> "Apply '$wallpaperTitle' in Xiaomi Video Wallpaper"
+            else -> "Apply '$wallpaperTitle' to Lock Screen"
+        }
+
+        btnSetWallpaper.text = actionText
+
+        if (isDim) {
+            btnSetWallpaper.alpha = 0.45f
+            btnSetWallpaper.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#261E38"))
+            btnSetWallpaper.setTextColor(Color.parseColor("#8E879E"))
+            btnSetWallpaper.iconTint = ColorStateList.valueOf(Color.parseColor("#8E879E"))
+        } else {
+            btnSetWallpaper.alpha = 1.0f
+            btnSetWallpaper.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
+            btnSetWallpaper.setTextColor(Color.parseColor("#0E0B16"))
+            btnSetWallpaper.iconTint = ColorStateList.valueOf(Color.parseColor("#0E0B16"))
+        }
+    }
+
+    private fun showGlassToast(message: String, isSuccess: Boolean = true) {
+        try {
+            val inflater = LayoutInflater.from(this)
+            val view = inflater.inflate(R.layout.view_glass_toast, null)
+            val ivIcon: ImageView = view.findViewById(R.id.ivToastIcon)
+            val tvMsg: TextView = view.findViewById(R.id.tvToastMessage)
+
+            tvMsg.text = message
+            ivIcon.setImageResource(if (isSuccess) R.drawable.ic_sparkle else R.drawable.ic_check)
+            ivIcon.imageTintList = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
+
+            val toast = Toast(this)
+            toast.duration = Toast.LENGTH_LONG
+            toast.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, 0, 200)
+            toast.view = view
+            toast.show()
+        } catch (_: Exception) {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -386,8 +424,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 )
                 storeAdapter.finishDownload(updated)
                 refreshGallery()
-                // Automatically preview the freshly downloaded wallpaper
-                selectWallpaper(updated)
+                showGlassToast("Downloaded '${item.title}'! Tap 'Select' to use.")
                 analytics.logAction("download_success", "SUCCESS", duration, mapOf(
                     "id" to item.id,
                     "title" to item.title,
@@ -402,7 +439,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     "title" to item.title
                 ), err)
                 analytics.flushSync()
-                Toast.makeText(this@MainActivity, "Download failed: ${err.message}", Toast.LENGTH_LONG).show()
+                showGlassToast("Download failed: ${err.message}", isSuccess = false)
             }
         }
     }
@@ -423,7 +460,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     if (current.id == item.id) {
                         stopPreviewPlayback()
                         tvActiveWallpaperSubtitle.text = "Video deleted from phone. Select another wallpaper below."
-                        btnSetWallpaper.text = "Select a Wallpaper"
+                        setApplyButtonState(isDim = true, title = "Select a Wallpaper")
                     } else {
                         playActiveVideoInPreview(current)
                     }
@@ -432,7 +469,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                         "id" to item.id,
                         "title" to item.title
                     ))
-                    Toast.makeText(this, "Local video deleted. Storage freed!", Toast.LENGTH_SHORT).show()
+                    showGlassToast("Local video deleted. Storage freed!")
                 } catch (e: Exception) {
                     val duration = System.currentTimeMillis() - start
                     analytics.logAction("delete_local_storage", "FAILED", duration, mapOf(
@@ -548,17 +585,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             adapter.setActiveId(item.id)
             updateSubtitle(item)
             playActiveVideoInPreview(item)
-            updateApplyButtonText(item)
+            // Brighten up the apply button with vibrant gold and bold text
+            setApplyButtonState(isDim = false, title = item.title)
             val duration = System.currentTimeMillis() - start
-            analytics.logAction("preview_selected", "SUCCESS", duration, mapOf(
+            analytics.logAction("wallpaper_selected", "SUCCESS", duration, mapOf(
                 "id" to item.id,
                 "title" to item.title,
                 "category" to item.category
             ))
-            Toast.makeText(this, "Loaded in preview! Tap 'Apply to Lock Screen' below to apply to phone", Toast.LENGTH_LONG).show()
+            showGlassToast("Selected '${item.title}'! Tap 'Apply to Lock Screen' below to apply to phone")
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - start
-            analytics.logAction("preview_selected", "FAILED", duration, mapOf(
+            analytics.logAction("wallpaper_selected", "FAILED", duration, mapOf(
                 "id" to item.id,
                 "title" to item.title
             ), e)

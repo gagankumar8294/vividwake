@@ -196,7 +196,7 @@ class StoreWallpaperAdapter(
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.VISIBLE
-                btnApply.text = "Select in Preview"
+                btnApply.text = "Select"
                 btnDeleteLocal.visibility = View.VISIBLE
             } else {
                 pbDownload.visibility = View.GONE
@@ -237,7 +237,7 @@ class StoreWallpaperAdapter(
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.VISIBLE
-                btnApply.text = "Select in Preview"
+                btnApply.text = "Select"
                 btnDeleteLocal.visibility = View.VISIBLE
             } else {
                 pbDownload.visibility = View.VISIBLE

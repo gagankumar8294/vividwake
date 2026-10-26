@@ -177,7 +177,7 @@
                     app:icon="@drawable/ic_download"
                     app:iconTint="#0E0B16" />
 
-                <!-- Apply Button (Only when downloaded) -->
+                <!-- Select Button (Only when downloaded) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStoreApply"
                     android:layout_width="0dp"
@@ -185,14 +185,14 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Select in Preview"
+                    android:text="Select"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
                     android:textSize="12sp"
                     android:textStyle="bold"
                     app:backgroundTint="#22C55E"
                     app:cornerRadius="8dp"
-                    app:icon="@drawable/ic_sparkle"
+                    app:icon="@drawable/ic_check"
                     app:iconTint="#0E0B16"
                     android:visibility="gone" />
 
