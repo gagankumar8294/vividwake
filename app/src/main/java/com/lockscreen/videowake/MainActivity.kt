@@ -103,6 +103,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var titleClickCount = 0
     private var lastTitleClickTime = 0L
 
+    private var isWallpaperSelectedForApply = false
+    private var selectedWallpaperItem: WallpaperItem? = null
+
     // SAF Save Video to chosen folder
     private val saveVideoLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -211,26 +214,30 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
             }
         }
-        setApplyButtonState(isDim = true, title = repository.getActiveWallpaper().title)
+        setApplyButtonState(isSelected = false, item = null)
     }
 
-    private fun setApplyButtonState(isDim: Boolean, title: String? = null) {
-        val wallpaperTitle = title ?: repository.getActiveWallpaper().title.ifBlank { "Wallpaper" }
-        val actionText = when {
-            isSamsung -> "Apply '$wallpaperTitle' to Samsung Lock Screen"
-            isXiaomi -> "Apply '$wallpaperTitle' in Xiaomi Video Wallpaper"
-            else -> "Apply '$wallpaperTitle' to Lock Screen"
-        }
+    private fun setApplyButtonState(isSelected: Boolean, item: WallpaperItem? = null) {
+        isWallpaperSelectedForApply = isSelected
+        selectedWallpaperItem = if (isSelected) item else null
 
-        btnSetWallpaper.text = actionText
-
-        if (isDim) {
-            btnSetWallpaper.alpha = 0.45f
+        if (!isSelected || item == null) {
+            btnSetWallpaper.text = "Select wallpaper to apply lock screen"
+            btnSetWallpaper.alpha = 0.40f
+            btnSetWallpaper.isEnabled = false
             btnSetWallpaper.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#261E38"))
             btnSetWallpaper.setTextColor(Color.parseColor("#8E879E"))
             btnSetWallpaper.iconTint = ColorStateList.valueOf(Color.parseColor("#8E879E"))
         } else {
+            val title = item.title.ifBlank { "Wallpaper" }
+            val actionText = when {
+                isSamsung -> "Apply '$title' to Samsung Lock Screen"
+                isXiaomi -> "Apply '$title' in Xiaomi Video Wallpaper"
+                else -> "Apply '$title' to Lock Screen"
+            }
+            btnSetWallpaper.text = actionText
             btnSetWallpaper.alpha = 1.0f
+            btnSetWallpaper.isEnabled = true
             btnSetWallpaper.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
             btnSetWallpaper.setTextColor(Color.parseColor("#0E0B16"))
             btnSetWallpaper.iconTint = ColorStateList.valueOf(Color.parseColor("#0E0B16"))
@@ -312,6 +319,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             btnTabMyWallpapers.backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
             btnTabMyWallpapers.setTextColor(Color.parseColor("#D4AF37"))
             btnTabMyWallpapers.iconTint = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
+
+            // Dim and disable apply button until user selects a wallpaper
+            setApplyButtonState(isSelected = false, item = null)
 
             val duration = System.currentTimeMillis() - start
             analytics.logAction("explore_store_tab_clicked", "SUCCESS", duration, mapOf("tab" to "explore_store"))
@@ -424,7 +434,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 )
                 storeAdapter.finishDownload(updated)
                 refreshGallery()
-                showGlassToast("Downloaded '${item.title}'! Tap 'Select' to use.")
+                // Silent download - no toast alert as requested
                 analytics.logAction("download_success", "SUCCESS", duration, mapOf(
                     "id" to item.id,
                     "title" to item.title,
@@ -457,10 +467,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     refreshGallery()
 
                     val current = repository.getActiveWallpaper()
-                    if (current.id == item.id) {
+                    if (current.id == item.id || selectedWallpaperItem?.id == item.id) {
                         stopPreviewPlayback()
                         tvActiveWallpaperSubtitle.text = "Video deleted from phone. Select another wallpaper below."
-                        setApplyButtonState(isDim = true, title = "Select a Wallpaper")
+                        setApplyButtonState(isSelected = false, item = null)
                     } else {
                         playActiveVideoInPreview(current)
                     }
@@ -469,7 +479,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                         "id" to item.id,
                         "title" to item.title
                     ))
-                    showGlassToast("Local video deleted. Storage freed!")
+                    // Silent delete - no toast alert as requested
                 } catch (e: Exception) {
                     val duration = System.currentTimeMillis() - start
                     analytics.logAction("delete_local_storage", "FAILED", duration, mapOf(
@@ -586,7 +596,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             updateSubtitle(item)
             playActiveVideoInPreview(item)
             // Brighten up the apply button with vibrant gold and bold text
-            setApplyButtonState(isDim = false, title = item.title)
+            setApplyButtonState(isSelected = true, item = item)
             val duration = System.currentTimeMillis() - start
             analytics.logAction("wallpaper_selected", "SUCCESS", duration, mapOf(
                 "id" to item.id,
@@ -610,9 +620,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .setPositiveButton("Delete") { _, _ ->
                 repository.deleteWallpaper(item)
                 refreshGallery()
+                if (selectedWallpaperItem?.id == item.id) {
+                    setApplyButtonState(isSelected = false, item = null)
+                }
                 val current = repository.getActiveWallpaper()
                 playActiveVideoInPreview(current)
-                Toast.makeText(this, "Wallpaper removed", Toast.LENGTH_SHORT).show()
+                // Silent delete - no toast alert as requested
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -687,8 +700,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun setupListeners() {
         btnSetWallpaper.setOnClickListener {
+            if (!isWallpaperSelectedForApply || selectedWallpaperItem == null) {
+                return@setOnClickListener
+            }
             val start = System.currentTimeMillis()
-            val activeItem = repository.getActiveWallpaper()
+            val activeItem = selectedWallpaperItem ?: repository.getActiveWallpaper()
             try {
                 when {
                     isSamsung -> {
