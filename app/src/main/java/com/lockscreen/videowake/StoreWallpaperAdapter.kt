@@ -83,10 +83,19 @@ class StoreWallpaperAdapter(
             downloadingProgressMap.remove(itemId)
         } else {
             downloadingProgressMap[itemId] = progress
+            val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
+            if (idx != -1) {
+                notifyItemChanged(idx, progress)
+            }
         }
-        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
+    }
+
+    fun finishDownload(updated: WallpaperItem) {
+        downloadingProgressMap.remove(updated.id)
+        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == updated.id }
         if (idx != -1) {
-            notifyItemChanged(idx, progress)
+            rows[idx] = StoreRow.Item(updated)
+            notifyItemChanged(idx)
         }
     }
 
@@ -187,6 +196,7 @@ class StoreWallpaperAdapter(
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.VISIBLE
+                btnApply.text = "Select in Preview"
                 btnDeleteLocal.visibility = View.VISIBLE
             } else {
                 pbDownload.visibility = View.GONE
@@ -197,9 +207,13 @@ class StoreWallpaperAdapter(
                 btnDeleteLocal.visibility = View.GONE
             }
 
-            // Click card to stream live preview
+            // Click anywhere on card: if downloaded, load preview; if not downloaded, start download
             card.setOnClickListener {
-                onPreview(item)
+                if (item.isDownloaded) {
+                    onApply(item)
+                } else {
+                    onDownload(item)
+                }
             }
 
             btnDownload.setOnClickListener {
@@ -218,13 +232,22 @@ class StoreWallpaperAdapter(
         }
 
         fun updateProgressOnly(progress: Int) {
-            pbDownload.visibility = View.VISIBLE
-            tvProgress.visibility = View.VISIBLE
-            pbDownload.progress = progress
-            tvProgress.text = "Downloading $progress%..."
-            btnDownload.visibility = View.GONE
-            btnApply.visibility = View.GONE
-            btnDeleteLocal.visibility = View.GONE
+            if (progress >= 100) {
+                pbDownload.visibility = View.GONE
+                tvProgress.visibility = View.GONE
+                btnDownload.visibility = View.GONE
+                btnApply.visibility = View.VISIBLE
+                btnApply.text = "Select in Preview"
+                btnDeleteLocal.visibility = View.VISIBLE
+            } else {
+                pbDownload.visibility = View.VISIBLE
+                tvProgress.visibility = View.VISIBLE
+                pbDownload.progress = progress
+                tvProgress.text = "Downloading $progress%..."
+                btnDownload.visibility = View.GONE
+                btnApply.visibility = View.GONE
+                btnDeleteLocal.visibility = View.GONE
+            }
         }
 
         private fun loadThumbnail(item: WallpaperItem) {

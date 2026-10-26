@@ -185,7 +185,7 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Apply"
+                    android:text="Select in Preview"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
                     android:textSize="12sp"

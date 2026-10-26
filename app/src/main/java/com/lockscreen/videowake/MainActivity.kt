@@ -191,26 +191,32 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         when {
             isSamsung -> {
                 tvDeviceBrand.text = "📱 Detected: Samsung Galaxy (One UI)"
-                btnSetWallpaper.text = "📱 Apply to Samsung Lock Screen"
                 tvPrimaryInstruction.text = "Opens Samsung One UI lock screen video setup directly"
             }
             isXiaomi -> {
                 tvDeviceBrand.text = "📱 Detected: Xiaomi / Redmi / Poco (HyperOS/MIUI)"
-                btnSetWallpaper.text = "📱 Open in Xiaomi Video Wallpaper"
                 tvPrimaryInstruction.text = "Opens video player: tap '...' ➔ 'Set video wallpaper' ➔ 'Lock screen'"
             }
             isColorOS -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
                 tvDeviceBrand.text = "📱 Detected: $brandName (OxygenOS / ColorOS)"
-                btnSetWallpaper.text = "✨ Apply to Lock Screen"
                 tvPrimaryInstruction.text = "Select 'Home and Lock screen'. Note: turn off 'Lock Screen Magazine' if it reverts."
             }
             else -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
                 tvDeviceBrand.text = "📱 Detected: $brandName (Native AOSP)"
-                btnSetWallpaper.text = "✨ Apply to Lock Screen"
                 tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
             }
+        }
+        updateApplyButtonText(repository.getActiveWallpaper())
+    }
+
+    private fun updateApplyButtonText(item: WallpaperItem) {
+        val title = item.title.ifBlank { "Wallpaper" }
+        when {
+            isSamsung -> btnSetWallpaper.text = "📱 Apply '$title' to Samsung Lock Screen"
+            isXiaomi -> btnSetWallpaper.text = "📱 Apply '$title' in Xiaomi Video Wallpaper"
+            else -> btnSetWallpaper.text = "📱 Apply '$title' to Lock Screen"
         }
     }
 
@@ -374,13 +380,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
             val duration = System.currentTimeMillis() - start
             result.onSuccess { downloadedFile ->
-                storeAdapter.setDownloadingProgress(item.id, 100)
                 val updated = item.copy(
                     filePath = downloadedFile.absolutePath,
                     isDownloaded = true
                 )
-                storeAdapter.updateItem(updated)
+                storeAdapter.finishDownload(updated)
                 refreshGallery()
+                // Automatically preview the freshly downloaded wallpaper
+                selectWallpaper(updated)
                 analytics.logAction("download_success", "SUCCESS", duration, mapOf(
                     "id" to item.id,
                     "title" to item.title,
@@ -388,7 +395,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     "speedKBps" to if (duration > 0) (downloadedFile.length() / duration) else 0
                 ))
                 analytics.flushSync()
-                Toast.makeText(this@MainActivity, "✨ Downloaded '${item.title}'!", Toast.LENGTH_SHORT).show()
             }.onFailure { err ->
                 storeAdapter.setDownloadingProgress(item.id, 100) // resets downloading state
                 analytics.logAction("download_failed", "FAILED", duration, mapOf(
@@ -414,7 +420,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     refreshGallery()
 
                     val current = repository.getActiveWallpaper()
-                    playActiveVideoInPreview(current)
+                    if (current.id == item.id) {
+                        stopPreviewPlayback()
+                        tvActiveWallpaperSubtitle.text = "Video deleted from phone. Select another wallpaper below."
+                        btnSetWallpaper.text = "Select a Wallpaper"
+                    } else {
+                        playActiveVideoInPreview(current)
+                    }
                     val duration = System.currentTimeMillis() - start
                     analytics.logAction("delete_local_storage", "SUCCESS", duration, mapOf(
                         "id" to item.id,
@@ -536,16 +548,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             adapter.setActiveId(item.id)
             updateSubtitle(item)
             playActiveVideoInPreview(item)
+            updateApplyButtonText(item)
             val duration = System.currentTimeMillis() - start
-            analytics.logAction("apply_wallpaper", "SUCCESS", duration, mapOf(
+            analytics.logAction("preview_selected", "SUCCESS", duration, mapOf(
                 "id" to item.id,
                 "title" to item.title,
                 "category" to item.category
             ))
-            Toast.makeText(this, "Active lock screen set to: ${item.title}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Loaded in preview! Tap 'Apply to Lock Screen' below to apply to phone", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - start
-            analytics.logAction("apply_wallpaper", "FAILED", duration, mapOf(
+            analytics.logAction("preview_selected", "FAILED", duration, mapOf(
                 "id" to item.id,
                 "title" to item.title
             ), e)
