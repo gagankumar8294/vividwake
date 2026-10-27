@@ -280,9 +280,9 @@ class StoreWallpaperAdapter(
                     val bitmap = withContext(Dispatchers.IO) {
                         if (cacheFile.exists() && cacheFile.length() > 0) {
                             try {
-                                val diskBmp = BitmapFactory.decodeFile(cacheFile.absolutePath)
+                                val diskBmp = decodeSampledBitmapFromFile(cacheFile.absolutePath, 480, 480)
                                 if (diskBmp != null) return@withContext diskBmp
-                            } catch (_: Exception) {}
+                            } catch (_: Throwable) {}
                         }
                         try {
                             val request = Request.Builder()
@@ -296,7 +296,7 @@ class StoreWallpaperAdapter(
                                         try {
                                             cacheFile.writeBytes(bytes)
                                         } catch (_: Exception) {}
-                                        return@withContext BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                        return@withContext decodeSampledBitmap(bytes, 480, 480)
                                     }
                                 }
                             }
@@ -315,6 +315,46 @@ class StoreWallpaperAdapter(
                 // Keep the allocated frame space clean and empty as requested
                 ivThumb.setImageDrawable(null)
             }
+        }
+
+        private fun decodeSampledBitmap(bytes: ByteArray, reqW: Int, reqH: Int): Bitmap? {
+            return try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                opts.inSampleSize = calculateInSampleSize(opts, reqW, reqH)
+                opts.inJustDecodeBounds = false
+                opts.inPreferredConfig = Bitmap.Config.RGB_565
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+        private fun decodeSampledBitmapFromFile(path: String, reqW: Int, reqH: Int): Bitmap? {
+            return try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(path, opts)
+                opts.inSampleSize = calculateInSampleSize(opts, reqW, reqH)
+                opts.inJustDecodeBounds = false
+                opts.inPreferredConfig = Bitmap.Config.RGB_565
+                BitmapFactory.decodeFile(path, opts)
+            } catch (_: Throwable) {
+                null
+            }
+        }
+
+        private fun calculateInSampleSize(opts: BitmapFactory.Options, reqW: Int, reqH: Int): Int {
+            val h = opts.outHeight
+            val w = opts.outWidth
+            var sampleSize = 1
+            if (h > reqH || w > reqW) {
+                val halfH = h / 2
+                val halfW = w / 2
+                while ((halfH / sampleSize) >= reqH && (halfW / sampleSize) >= reqW) {
+                    sampleSize *= 2
+                }
+            }
+            return sampleSize
         }
 
         private fun saveBitmapToFile(bitmap: Bitmap, file: File) {
