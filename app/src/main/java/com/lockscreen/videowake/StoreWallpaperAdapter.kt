@@ -20,9 +20,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
-import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
  * StoreWallpaperAdapter — Dynamic multi-category catalog adapter for the Explore Store.
@@ -45,6 +47,13 @@ class StoreWallpaperAdapter(
         private const val TAG = "StoreWallpaperAdapter"
         private const val VIEW_TYPE_HEADER = 0
         private const val VIEW_TYPE_ITEM = 1
+
+        private val httpClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
 
         private val memoryCache: LruCache<String, Bitmap> = run {
             val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
@@ -272,18 +281,25 @@ class StoreWallpaperAdapter(
                             } catch (_: Exception) {}
                         }
                         try {
-                            val conn = URL(item.thumbUrl).openConnection().apply {
-                                connectTimeout = 4000
-                                readTimeout = 4000
+                            val request = Request.Builder()
+                                .url(item.thumbUrl)
+                                .header("User-Agent", "VideoLockScreen-Android")
+                                .build()
+                            httpClient.newCall(request).execute().use { response ->
+                                if (response.isSuccessful) {
+                                    val stream = response.body?.byteStream()
+                                    if (stream != null) {
+                                        val downloaded = BitmapFactory.decodeStream(stream)
+                                        if (downloaded != null) {
+                                            saveBitmapToFile(downloaded, cacheFile)
+                                            return@withContext downloaded
+                                        }
+                                    }
+                                }
                             }
-                            val downloaded = conn.getInputStream().use { stream ->
-                                BitmapFactory.decodeStream(stream)
-                            }
-                            if (downloaded != null) {
-                                saveBitmapToFile(downloaded, cacheFile)
-                                return@withContext downloaded
-                            }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to load thumb from ${item.thumbUrl}: ${e.message}")
+                        }
                         null
                     }
 
