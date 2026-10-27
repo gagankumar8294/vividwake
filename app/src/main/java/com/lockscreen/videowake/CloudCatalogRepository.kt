@@ -25,8 +25,8 @@ class CloudCatalogRepository(
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
         .build()
 
     suspend fun fetchCatalog(isAdminMode: Boolean = false): List<WallpaperItem> = withContext(Dispatchers.IO) {
@@ -41,12 +41,18 @@ class CloudCatalogRepository(
     }
 
     private fun fetchRemoteJsonOrFallback(): String {
-        try {
-            if (CloudConfig.CATALOG_URL.isNotBlank()) {
-                val urlWithBuster = if (CloudConfig.CATALOG_URL.contains("?")) {
-                    "${CloudConfig.CATALOG_URL}&_nocache=${System.currentTimeMillis()}"
+        val urls = listOf(
+            CloudConfig.CATALOG_URL,
+            "https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json",
+            "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/wallpapers.json"
+        ).distinct()
+
+        for (baseUrl in urls) {
+            try {
+                val urlWithBuster = if (baseUrl.contains("?")) {
+                    "$baseUrl&_nocache=${System.currentTimeMillis()}"
                 } else {
-                    "${CloudConfig.CATALOG_URL}?_nocache=${System.currentTimeMillis()}"
+                    "$baseUrl?_nocache=${System.currentTimeMillis()}"
                 }
                 val request = Request.Builder()
                     .url(urlWithBuster)
@@ -60,14 +66,14 @@ class CloudCatalogRepository(
                     if (response.isSuccessful) {
                         val body = response.body?.string()
                         if (!body.isNullOrBlank()) {
-                            Log.d(TAG, "Fetched live wallpapers.json from remote (${body.length} chars)")
+                            Log.d(TAG, "Fetched live wallpapers.json from $baseUrl (${body.length} chars)")
                             return body
                         }
                     }
                 }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed fetch from $baseUrl (${e.message}), trying next...")
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Remote catalog fetch failed (${e.message}), using bundled catalog")
         }
         return getAssetCatalog()
     }

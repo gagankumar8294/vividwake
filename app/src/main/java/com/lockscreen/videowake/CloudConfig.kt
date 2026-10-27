@@ -5,7 +5,7 @@ package com.lockscreen.videowake
  */
 object CloudConfig {
 
-    var CATALOG_URL: String = "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/wallpapers.json"
+    var CATALOG_URL: String = "https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json"
     var ANALYTICS_BASE_URL: String = "https://vividwake-backend.onrender.com"
     const val ADMIN_SECRET_PIN: String = "7788"
 
@@ -47,6 +47,24 @@ object CloudConfig {
         "thumbUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Stormborn.Viking.Warrior.png",
         "sizeBytes": 5558076,
         "sizeDisplay": "5.30 MB",
+        "durationMs": 8000,
+        "width": 1080,
+        "height": 1920,
+        "version": 1
+      },
+      {
+        "id": "wp_pubg_last_survivor_01",
+        "title": "Last Survivor Battlefield",
+        "category": "PUBG",
+        "description": "Cinematic lone soldier standing on the battlefield amidst dense battle smoke.",
+        "tags": ["pubg", "battleground", "soldier", "battlefield", "survivor", "military", "warzone", "fps", "action"],
+        "status": "published",
+        "isFeatured": true,
+        "isVipOnly": false,
+        "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Soldier_live_wallpaper_animation_20261027214920.mp4",
+        "thumbUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Soldier_standing_on_battlefield_2K_20261027215040.jpg",
+        "sizeBytes": 2946571,
+        "sizeDisplay": "2.81 MB",
         "durationMs": 8000,
         "width": 1080,
         "height": 1920,
