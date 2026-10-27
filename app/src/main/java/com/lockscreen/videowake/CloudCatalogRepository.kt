@@ -101,6 +101,15 @@ class CloudCatalogRepository(
                 val width = obj.optInt("width", 1080)
                 val height = obj.optInt("height", 1920)
 
+                val tagsList = mutableListOf<String>()
+                val tagsArray = obj.optJSONArray("tags")
+                if (tagsArray != null) {
+                    for (t in 0 until tagsArray.length()) {
+                        val tag = tagsArray.optString(t)
+                        if (!tag.isNullOrBlank()) tagsList.add(tag)
+                    }
+                }
+
                 // Visibility rule:
                 // Non-admin sees ONLY "published".
                 // Admin sees "published", "hidden", and "draft".
@@ -131,7 +140,8 @@ class CloudCatalogRepository(
                         status = status,
                         isFeatured = isFeatured,
                         isVipOnly = isVipOnly,
-                        category = category
+                        category = category,
+                        tags = tagsList
                     )
                 )
             }
