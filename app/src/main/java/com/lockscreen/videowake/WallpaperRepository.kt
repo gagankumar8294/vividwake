@@ -43,15 +43,6 @@ class WallpaperRepository(private val context: Context) {
                 rawResName = "lock_wake_video",
                 width = 720,
                 height = 1280
-            ),
-            WallpaperItem(
-                id = ID_PRESET_WAND,
-                title = "Wand Magic",
-                isPreset = true,
-                rawResId = R.raw.preset_wand_wake,
-                rawResName = "preset_wand_wake",
-                width = 720,
-                height = 1280
             )
         )
     }
