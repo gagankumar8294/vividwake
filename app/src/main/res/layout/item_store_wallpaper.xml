@@ -19,67 +19,76 @@
         android:padding="12dp">
 
         <!-- Thumbnail Frame -->
-        <FrameLayout
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="90dp"
-            android:layout_height="130dp">
+            android:layout_height="130dp"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#2E2544"
+            app:strokeWidth="1dp">
 
-            <ImageView
-                android:id="@+id/ivStoreThumb"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="#1C162E"
-                android:contentDescription="Wallpaper Thumbnail"
-                android:scaleType="centerCrop" />
+                android:layout_height="match_parent">
 
-            <!-- Featured Badge -->
-            <TextView
-                android:id="@+id/tvStoreFeaturedBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|start"
-                android:layout_margin="4dp"
-                android:background="#D4AF37"
-                android:paddingHorizontal="6dp"
-                android:paddingVertical="2dp"
-                android:text="★ STAR"
-                android:textColor="#0E0B16"
-                android:textSize="9sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <ImageView
+                    android:id="@+id/ivStoreThumb"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#1C162E"
+                    android:contentDescription="Wallpaper Thumbnail"
+                    android:scaleType="centerCrop" />
 
-            <!-- Admin Hidden Badge -->
-            <TextView
-                android:id="@+id/tvStoreHiddenBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="bottom|start"
-                android:layout_margin="4dp"
-                android:background="#B45309"
-                android:paddingHorizontal="5dp"
-                android:paddingVertical="2dp"
-                android:text="DRAFT"
-                android:textColor="#FFFFFF"
-                android:textSize="9sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <!-- Featured Badge -->
+                <TextView
+                    android:id="@+id/tvStoreFeaturedBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="4dp"
+                    android:background="#D4AF37"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="★ STAR"
+                    android:textColor="#0E0B16"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
-            <!-- Downloaded Check Badge -->
-            <TextView
-                android:id="@+id/tvStoreDownloadedBadge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top|end"
-                android:layout_margin="4dp"
-                android:background="#22C55E"
-                android:paddingHorizontal="6dp"
-                android:paddingVertical="2dp"
-                android:text="✓"
-                android:textColor="#FFFFFF"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <!-- Admin Hidden Badge -->
+                <TextView
+                    android:id="@+id/tvStoreHiddenBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|start"
+                    android:layout_margin="4dp"
+                    android:background="#B45309"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="2dp"
+                    android:text="DRAFT"
+                    android:textColor="#FFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
-        </FrameLayout>
+                <!-- Downloaded Check Badge -->
+                <TextView
+                    android:id="@+id/tvStoreDownloadedBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="4dp"
+                    android:background="#22C55E"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:text="✓"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- Details & Actions Column -->
         <LinearLayout

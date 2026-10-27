@@ -261,6 +261,7 @@ class StoreWallpaperAdapter(
 
         private fun loadThumbnail(item: WallpaperItem) {
             thumbJob?.cancel()
+            ivThumb.tag = item.id
 
             // If item has a custom thumbUrl provided, load that lightweight image
             if (item.thumbUrl.isNotBlank()) {
@@ -270,6 +271,8 @@ class StoreWallpaperAdapter(
                     return
                 }
 
+                ivThumb.setImageDrawable(null)
+
                 val thumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS).apply { mkdirs() }
                 val cacheFile = File(thumbsDir, "thumb_${item.id}.jpg")
 
@@ -277,7 +280,8 @@ class StoreWallpaperAdapter(
                     val bitmap = withContext(Dispatchers.IO) {
                         if (cacheFile.exists() && cacheFile.length() > 0) {
                             try {
-                                return@withContext BitmapFactory.decodeFile(cacheFile.absolutePath)
+                                val diskBmp = BitmapFactory.decodeFile(cacheFile.absolutePath)
+                                if (diskBmp != null) return@withContext diskBmp
                             } catch (_: Exception) {}
                         }
                         try {
@@ -287,13 +291,12 @@ class StoreWallpaperAdapter(
                                 .build()
                             httpClient.newCall(request).execute().use { response ->
                                 if (response.isSuccessful) {
-                                    val stream = response.body?.byteStream()
-                                    if (stream != null) {
-                                        val downloaded = BitmapFactory.decodeStream(stream)
-                                        if (downloaded != null) {
-                                            saveBitmapToFile(downloaded, cacheFile)
-                                            return@withContext downloaded
-                                        }
+                                    val bytes = response.body?.bytes()
+                                    if (bytes != null && bytes.isNotEmpty()) {
+                                        try {
+                                            cacheFile.writeBytes(bytes)
+                                        } catch (_: Exception) {}
+                                        return@withContext BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                                     }
                                 }
                             }
@@ -303,11 +306,9 @@ class StoreWallpaperAdapter(
                         null
                     }
 
-                    if (bitmap != null) {
+                    if (bitmap != null && ivThumb.tag == item.id) {
                         memoryCache.put(item.id, bitmap)
                         ivThumb.setImageBitmap(bitmap)
-                    } else {
-                        ivThumb.setImageDrawable(null)
                     }
                 }
             } else {
