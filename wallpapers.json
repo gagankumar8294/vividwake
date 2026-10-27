@@ -54,5 +54,34 @@
     "height": 1920,
     "version": 1,
     "addedAt": 1730000000000
+  },
+  {
+    "id": "wp_pubg_last_survivor_01",
+    "title": "Last Survivor Battlefield",
+    "category": "PUBG",
+    "description": "Cinematic lone soldier standing on the battlefield amidst dense battle smoke.",
+    "tags": [
+      "pubg",
+      "battleground",
+      "soldier",
+      "battlefield",
+      "survivor",
+      "military",
+      "warzone",
+      "fps",
+      "action"
+    ],
+    "status": "published",
+    "isFeatured": true,
+    "isVipOnly": false,
+    "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Soldier_live_wallpaper_animation_20261027214920.mp4",
+    "thumbUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Soldier_standing_on_battlefield_2K_20261027215040.jpg",
+    "sizeBytes": 2946571,
+    "sizeDisplay": "2.81 MB",
+    "durationMs": 8000,
+    "width": 1080,
+    "height": 1920,
+    "version": 1,
+    "addedAt": 1730044000000
   }
 ]
