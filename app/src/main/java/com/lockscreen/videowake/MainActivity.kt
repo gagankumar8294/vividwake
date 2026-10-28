@@ -66,14 +66,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var ivUserAuthPhoto: ImageView
     private lateinit var tvUserAuthInitial: TextView
 
-    // DriveNotes Style Profile Header Card
-    private lateinit var cardUserProfile: View
-    private lateinit var ivProfileCardAvatar: ImageView
-    private lateinit var tvProfileCardInitial: TextView
-    private lateinit var tvProfileCardName: TextView
-    private lateinit var tvProfileCardEmail: TextView
-    private lateinit var tvProfileCardBadge: TextView
-
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
     private lateinit var tvActiveWallpaperSubtitle: TextView
@@ -267,17 +259,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvUserAuthText = findViewById(R.id.tvUserAuthText)
         ivUserAuthPhoto = findViewById(R.id.ivUserAuthPhoto)
         tvUserAuthInitial = findViewById(R.id.tvUserAuthInitial)
-
-        cardUserProfile = findViewById(R.id.cardUserProfile)
-        ivProfileCardAvatar = findViewById(R.id.ivProfileCardAvatar)
-        tvProfileCardInitial = findViewById(R.id.tvProfileCardInitial)
-        tvProfileCardName = findViewById(R.id.tvProfileCardName)
-        tvProfileCardEmail = findViewById(R.id.tvProfileCardEmail)
-        tvProfileCardBadge = findViewById(R.id.tvProfileCardBadge)
-
-        cardUserProfile.setOnClickListener {
-            showAccountProfileDialog()
-        }
 
         authManager = AuthManager(this)
         inAppNotificationManager = InAppNotificationManager(this)
@@ -848,12 +829,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             ivUserAuthIcon.visibility = View.GONE
             loadProfileAvatar(user.photoUrl?.toString(), displayName, ivUserAuthPhoto, tvUserAuthInitial)
 
-            // DriveNotes Style User Profile Header Card
-            cardUserProfile.visibility = View.VISIBLE
-            tvProfileCardName.text = displayName
-            tvProfileCardEmail.text = email
-            loadProfileAvatar(user.photoUrl?.toString(), displayName, ivProfileCardAvatar, tvProfileCardInitial)
-
             analytics.linkUserToDevice(
                 user.uid,
                 email,
@@ -870,9 +845,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             ivUserAuthIcon.visibility = View.VISIBLE
             ivUserAuthPhoto.visibility = View.GONE
             tvUserAuthInitial.visibility = View.GONE
-
-            // Hide Profile Card
-            cardUserProfile.visibility = View.GONE
         }
     }
 
