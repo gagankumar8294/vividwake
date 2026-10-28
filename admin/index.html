@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VividWake — Admin Control Panel</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-card {
+      background: rgba(23, 27, 41, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(61, 50, 84, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-[#0B0814] text-[#E0DEF4] min-h-screen">
+
+  <!-- Top Navbar -->
+  <nav class="glass-card sticky top-0 z-50 px-6 py-4 border-b border-[#2E2445] flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9D4EDD] to-[#FF4D6D] flex items-center justify-center text-white shadow-lg shadow-purple-900/30">
+        <i class="fa-solid fa-wand-magic-sparkles text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-white tracking-wide flex items-center gap-2">
+          VividWake <span class="bg-[#9D4EDD]/20 text-[#C77DFF] text-xs font-semibold px-2 py-0.5 rounded-full border border-[#9D4EDD]/30">Admin Panel</span>
+        </h1>
+        <p class="text-xs text-[#8E86A8]">Control push notifications, users, and wallpaper assignments</p>
+      </div>
+    </div>
+
+    <!-- Auth State Pill -->
+    <div id="navAuthSection">
+      <button id="btnGoogleSignIn" class="bg-white text-gray-900 hover:bg-gray-100 font-semibold text-xs px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-sm">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4" alt="Google">
+        <span>Sign In with Google</span>
+      </button>
+      <div id="adminProfile" class="hidden flex items-center space-x-3">
+        <img id="adminAvatar" src="" class="w-8 h-8 rounded-full border border-[#9D4EDD]" alt="Avatar">
+        <div class="text-left">
+          <p id="adminName" class="text-xs font-bold text-white">Admin</p>
+          <p id="adminEmail" class="text-[10px] text-[#8E86A8]">admin@gmail.com</p>
+        </div>
+        <button id="btnSignOut" class="text-xs text-red-400 hover:text-red-300 ml-2 py-1 px-2 rounded hover:bg-red-500/10">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- KPI Summary Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="glass-card p-5 rounded-2xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-[#8E86A8] uppercase tracking-wider">Total Users</span>
+          <i class="fa-solid fa-users text-[#9D4EDD] text-lg"></i>
+        </div>
+        <p id="statTotalUsers" class="text-2xl font-extrabold text-white mt-2">0</p>
+        <span class="text-[11px] text-emerald-400 mt-1 inline-block">Realtime synced from Firestore</span>
+      </div>
+
+      <div class="glass-card p-5 rounded-2xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-[#8E86A8] uppercase tracking-wider">FCM Devices</span>
+          <i class="fa-solid fa-mobile-screen-button text-pink-500 text-lg"></i>
+        </div>
+        <p id="statFcmDevices" class="text-2xl font-extrabold text-white mt-2">0</p>
+        <span class="text-[11px] text-pink-400 mt-1 inline-block">Ready to receive push alerts</span>
+      </div>
+
+      <div class="glass-card p-5 rounded-2xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-[#8E86A8] uppercase tracking-wider">Store Wallpapers</span>
+          <i class="fa-solid fa-photo-film text-amber-400 text-lg"></i>
+        </div>
+        <p id="statTotalWallpapers" class="text-2xl font-extrabold text-white mt-2">4</p>
+        <span class="text-[11px] text-amber-300 mt-1 inline-block">Published in wallpapers.json</span>
+      </div>
+
+      <div class="glass-card p-5 rounded-2xl">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-[#8E86A8] uppercase tracking-wider">Cloud Tier</span>
+          <i class="fa-solid fa-shield-halved text-emerald-400 text-lg"></i>
+        </div>
+        <p class="text-2xl font-extrabold text-white mt-2">Free $0</p>
+        <span class="text-[11px] text-emerald-400 mt-1 inline-block">Firebase Spark Plan (Free Forever)</span>
+      </div>
+    </div>
+
+    <!-- Tab Buttons -->
+    <div class="flex border-b border-[#2E2445] mb-6 space-x-6">
+      <button onclick="switchTab('tab-users')" id="btnTabUsers" class="py-3 px-1 text-sm font-bold border-b-2 border-[#9D4EDD] text-white flex items-center gap-2">
+        <i class="fa-solid fa-user-group"></i> Registered Users
+      </button>
+      <button onclick="switchTab('tab-assign')" id="btnTabAssign" class="py-3 px-1 text-sm font-semibold border-b-2 border-transparent text-[#8E86A8] hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-key"></i> Assign Wallpapers
+      </button>
+      <button onclick="switchTab('tab-notify')" id="btnTabNotify" class="py-3 px-1 text-sm font-semibold border-b-2 border-transparent text-[#8E86A8] hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-paper-plane"></i> Send Notification
+      </button>
+      <button onclick="switchTab('tab-catalog')" id="btnTabCatalog" class="py-3 px-1 text-sm font-semibold border-b-2 border-transparent text-[#8E86A8] hover:text-white flex items-center gap-2">
+        <i class="fa-solid fa-images"></i> Wallpaper Catalog
+      </button>
+    </div>
+
+    <!-- TAB 1: USERS -->
+    <div id="tab-users" class="tab-content">
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Active Mobile Users</h2>
+            <p class="text-xs text-[#8E86A8]">Users who signed in with Google OAuth from the mobile app</p>
+          </div>
+          <button onclick="loadUsers()" class="text-xs bg-[#2E2445] hover:bg-[#3D3254] px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate-right"></i> Refresh
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-[#8E86A8] border-b border-[#2E2445] uppercase text-[10px] tracking-wider">
+              <tr>
+                <th class="py-3 px-4">User</th>
+                <th class="py-3 px-4">UID</th>
+                <th class="py-3 px-4">Push Token</th>
+                <th class="py-3 px-4">Assigned Wallpapers</th>
+                <th class="py-3 px-4">Last Active</th>
+                <th class="py-3 px-4 text-right">Quick Action</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody" class="divide-y divide-[#2E2445]/50">
+              <tr>
+                <td colspan="6" class="text-center py-8 text-[#8E86A8]">Loading users from Firestore...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: ASSIGN WALLPAPERS -->
+    <div id="tab-assign" class="tab-content hidden">
+      <div class="glass-card rounded-2xl p-6 max-w-2xl mx-auto">
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-user-lock text-[#9D4EDD]"></i> Assign Wallpaper to Specific User
+          </h2>
+          <p class="text-xs text-[#8E86A8] mt-1">
+            Grant exclusive access or unlock special wallpapers for individual users. The app updates in real-time.
+          </p>
+        </div>
+
+        <form id="formAssign" onsubmit="handleAssignWallpaper(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Select Target User</label>
+            <select id="assignUserSelect" required class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+              <option value="">Select a registered user...</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Select Wallpaper to Assign</label>
+            <select id="assignWallpaperSelect" required class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+              <option value="wp_pubg_airdrop_02">PUBG — Supply Drop Ambush</option>
+              <option value="wp_pubg_last_survivor_01">PUBG — Last Survivor Battlefield</option>
+              <option value="wp_viking_warrior_01">Norse — Viking Warrior Ragnarok</option>
+              <option value="wp_game_character_01">Gaming — Game Character Wake</option>
+            </select>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" id="btnSubmitAssign" class="w-full bg-gradient-to-r from-[#9D4EDD] to-[#7B2CBF] hover:opacity-95 text-white font-bold text-xs py-3 rounded-xl shadow-lg shadow-purple-900/30 transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-check"></i> Assign Wallpaper & Send Alert
+            </button>
+          </div>
+        </form>
+
+        <div id="assignStatusMessage" class="hidden mt-4 p-3 rounded-xl text-xs"></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: NOTIFICATIONS -->
+    <div id="tab-notify" class="tab-content hidden">
+      <div class="glass-card rounded-2xl p-6 max-w-2xl mx-auto">
+        <div class="mb-6">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-bullhorn text-pink-500"></i> Push Notification Composer
+          </h2>
+          <p class="text-xs text-[#8E86A8] mt-1">
+            Dispatch high-priority system status bar notifications or silent in-app alerts directly to user devices.
+          </p>
+        </div>
+
+        <form id="formNotify" onsubmit="handleSendNotification(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Notification Title</label>
+            <input type="text" id="notifTitle" required placeholder="e.g. 🔥 New PUBG Live Wallpaper Drops!" class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Notification Message</label>
+            <textarea id="notifBody" required rows="3" placeholder="e.g. Tap here to preview and download 'Supply Drop Ambush' onto your lock screen." class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none"></textarea>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Target Audience</label>
+              <select id="notifTarget" class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+                <option value="all">📢 All Users (Topic: all_users)</option>
+                <option value="single">👤 Specific Single User</option>
+              </select>
+            </div>
+
+            <div id="wrapperSpecificUser" class="hidden">
+              <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Choose User</label>
+              <select id="notifUserSelect" class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+                <option value="">Select user...</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Delivery Channel</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="glass-card p-3 rounded-xl border border-[#2E2445] flex items-center gap-2 cursor-pointer hover:border-[#9D4EDD]">
+                <input type="radio" name="deliveryType" value="both" checked class="text-[#9D4EDD]">
+                <span class="text-xs text-white">⚡ Both (Status + In-App)</span>
+              </label>
+              <label class="glass-card p-3 rounded-xl border border-[#2E2445] flex items-center gap-2 cursor-pointer hover:border-[#9D4EDD]">
+                <input type="radio" name="deliveryType" value="system" class="text-[#9D4EDD]">
+                <span class="text-xs text-white">🔔 Status Bar Only</span>
+              </label>
+              <label class="glass-card p-3 rounded-xl border border-[#2E2445] flex items-center gap-2 cursor-pointer hover:border-[#9D4EDD]">
+                <input type="radio" name="deliveryType" value="in_app" class="text-[#9D4EDD]">
+                <span class="text-xs text-white">📥 In-App Inbox Only</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-[#8E86A8] uppercase mb-1">Attached Wallpaper (Optional)</label>
+            <select id="notifWallpaper" class="w-full bg-[#130F21] border border-[#2E2445] text-white text-xs rounded-xl px-3 py-2.5 focus:border-[#9D4EDD] outline-none">
+              <option value="">None (Opens App Home)</option>
+              <option value="wp_pubg_airdrop_02">PUBG — Supply Drop Ambush</option>
+              <option value="wp_pubg_last_survivor_01">PUBG — Last Survivor Battlefield</option>
+              <option value="wp_viking_warrior_01">Norse — Viking Warrior Ragnarok</option>
+              <option value="wp_game_character_01">Gaming — Game Character Wake</option>
+            </select>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" id="btnSubmitNotify" class="w-full bg-gradient-to-r from-[#FF4D6D] to-[#9D4EDD] hover:opacity-95 text-white font-bold text-xs py-3 rounded-xl shadow-lg shadow-pink-900/30 transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i> Dispatch Notification Now
+            </button>
+          </div>
+        </form>
+
+        <div id="notifStatusMessage" class="hidden mt-4 p-3 rounded-xl text-xs"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: CATALOG -->
+    <div id="tab-catalog" class="tab-content hidden">
+      <div class="glass-card rounded-2xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white">Live Wallpaper Catalog</h2>
+            <p class="text-xs text-[#8E86A8]">Currently published wallpapers fetched directly from wallpapers.json</p>
+          </div>
+          <a href="https://github.com/gagankumar8294/vividwake/blob/main/wallpapers.json" target="_blank" class="text-xs bg-[#2E2445] hover:bg-[#3D3254] px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1.5">
+            <i class="fa-brands fa-github"></i> Edit wallpapers.json
+          </a>
+        </div>
+
+        <div id="catalogGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Firebase Scripts (Compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // Firebase Config from google-services.json
+    const firebaseConfig = {
+      apiKey: "AIzaSyCxT9w5nQMaj-2pNm5asu9vnBnRV8vYapE",
+      authDomain: "vividwake-75ad8.firebaseapp.com",
+      projectId: "vividwake-75ad8",
+      storageBucket: "vividwake-75ad8.firebasestorage.app",
+      messagingSenderId: "954237427339",
+      appId: "1:954237427339:android:0f52a9cb12be04080dbe8e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let allUsersList = [];
+
+    // Auth State Observer
+    auth.onAuthStateChanged(user => {
+      const btnSignIn = document.getElementById('btnGoogleSignIn');
+      const profile = document.getElementById('adminProfile');
+      if (user) {
+        btnSignIn.classList.add('hidden');
+        profile.classList.remove('hidden');
+        document.getElementById('adminName').textContent = user.displayName || 'Admin';
+        document.getElementById('adminEmail').textContent = user.email || '';
+        document.getElementById('adminAvatar').src = user.photoURL || 'https://www.gravatar.com/avatar/?d=mp';
+      } else {
+        btnSignIn.classList.remove('hidden');
+        profile.classList.add('hidden');
+      }
+      loadUsers();
+    });
+
+    document.getElementById('btnGoogleSignIn').addEventListener('click', () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(e => alert("Sign In Error: " + e.message));
+    });
+
+    document.getElementById('btnSignOut').addEventListener('click', () => {
+      auth.signOut();
+    });
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+
+      const tabs = ['tab-users', 'tab-assign', 'tab-notify', 'tab-catalog'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('btn' + t.replace('tab-', 'Tab').replace(/^\w/, c => c.toUpperCase()));
+        if (btn) {
+          if (t === tabId) {
+            btn.classList.add('border-[#9D4EDD]', 'text-white');
+            btn.classList.remove('border-transparent', 'text-[#8E86A8]');
+          } else {
+            btn.classList.remove('border-[#9D4EDD]', 'text-white');
+            btn.classList.add('border-transparent', 'text-[#8E86A8]');
+          }
+        }
+      });
+
+      if (tabId === 'tab-catalog') loadCatalog();
+    }
+
+    // Toggle specific user dropdown in notify tab
+    document.getElementById('notifTarget').addEventListener('change', e => {
+      const isSingle = e.target.value === 'single';
+      document.getElementById('wrapperSpecificUser').classList.toggle('hidden', !isSingle);
+    });
+
+    // Load Users from Firestore
+    function loadUsers() {
+      db.collection('users').onSnapshot(snapshot => {
+        const tbody = document.getElementById('usersTableBody');
+        const assignSelect = document.getElementById('assignUserSelect');
+        const notifSelect = document.getElementById('notifUserSelect');
+
+        allUsersList = [];
+        tbody.innerHTML = '';
+        assignSelect.innerHTML = '<option value="">Select a registered user...</option>';
+        notifSelect.innerHTML = '<option value="">Select user...</option>';
+
+        let fcmCount = 0;
+
+        snapshot.forEach(doc => {
+          const u = doc.data();
+          allUsersList.push({ id: doc.id, ...u });
+          if (u.fcmToken) fcmCount++;
+
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-[#1A1528] transition-colors";
+
+          const assignedList = u.assignedWallpapers || [];
+          const assignedBadges = assignedList.length > 0 
+            ? assignedList.map(a => `<span class="bg-[#9D4EDD]/20 text-[#C77DFF] px-2 py-0.5 rounded text-[10px] mr-1">${a}</span>`).join('') 
+            : '<span class="text-gray-500">None</span>';
+
+          const timeStr = u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString() : 'N/A';
+          const tokenBadge = u.fcmToken 
+            ? `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-circle-check"></i> Connected</span>`
+            : `<span class="text-gray-500">Pending</span>`;
+
+          tr.innerHTML = `
+            <td class="py-3 px-4 flex items-center gap-2">
+              <img src="${u.photoUrl || 'https://www.gravatar.com/avatar/?d=mp'}" class="w-6 h-6 rounded-full border border-purple-500/30">
+              <div>
+                <p class="font-bold text-white">${u.displayName || 'Unnamed User'}</p>
+                <p class="text-[10px] text-[#8E86A8]">${u.email || ''}</p>
+              </div>
+            </td>
+            <td class="py-3 px-4 font-mono text-[10px] text-gray-400">${u.uid ? u.uid.substring(0, 10) + '...' : doc.id}</td>
+            <td class="py-3 px-4">${tokenBadge}</td>
+            <td class="py-3 px-4">${assignedBadges}</td>
+            <td class="py-3 px-4 text-gray-400">${timeStr}</td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="quickAssign('${doc.id}')" class="text-[10px] bg-[#9D4EDD]/20 hover:bg-[#9D4EDD]/40 text-[#C77DFF] font-semibold px-2 py-1 rounded">Assign</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+
+          // Populate dropdowns
+          const opt = `<option value="${doc.id}">${u.displayName || u.email || doc.id} (${u.email || ''})</option>`;
+          assignSelect.innerHTML += opt;
+          notifSelect.innerHTML += opt;
+        });
+
+        document.getElementById('statTotalUsers').textContent = snapshot.size;
+        document.getElementById('statFcmDevices').textContent = fcmCount;
+
+        if (snapshot.size === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-[#8E86A8]">No users registered yet. Open the app on a phone and tap "Sign In" with Google!</td></tr>`;
+        }
+      }, err => {
+        console.warn("Firestore listen error:", err);
+      });
+    }
+
+    function quickAssign(uid) {
+      switchTab('tab-assign');
+      document.getElementById('assignUserSelect').value = uid;
+    }
+
+    // Handle Wallpaper Assignment
+    async function handleAssignWallpaper(e) {
+      e.preventDefault();
+      const uid = document.getElementById('assignUserSelect').value;
+      const wpId = document.getElementById('assignWallpaperSelect').value;
+      const status = document.getElementById('assignStatusMessage');
+      const btn = document.getElementById('btnSubmitAssign');
+
+      if (!uid || !wpId) return;
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Assigning...`;
+
+      try {
+        // 1. Update user assignedWallpapers array in Firestore
+        await db.collection('users').document(uid).set({
+          assignedWallpapers: firebase.firestore.FieldValue.arrayUnion(wpId)
+        }, { merge: true });
+
+        // 2. Add an in-app notification for the user
+        await db.collection('users').document(uid).collection('inapp_notifications').add({
+          title: "🎁 Special Wallpaper Unlocked!",
+          body: `Admin assigned '${wpId}' directly to your account. Enjoy your new lock screen!`,
+          wallpaperId: wpId,
+          timestamp: Date.now(),
+          isRead: false
+        });
+
+        status.className = "mt-4 p-3 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
+        status.innerHTML = `<i class="fa-solid fa-check"></i> Successfully assigned <b>${wpId}</b> to user!`;
+        status.classList.remove('hidden');
+      } catch (err) {
+        status.className = "mt-4 p-3 rounded-xl text-xs bg-red-500/10 border border-red-500/30 text-red-400";
+        status.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Error assigning: ${err.message}`;
+        status.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Assign Wallpaper & Send Alert`;
+      }
+    }
+
+    // Handle Notification Dispatch
+    async function handleSendNotification(e) {
+      e.preventDefault();
+      const title = document.getElementById('notifTitle').value;
+      const body = document.getElementById('notifBody').value;
+      const target = document.getElementById('notifTarget').value;
+      const singleUid = document.getElementById('notifUserSelect').value;
+      const deliveryType = document.querySelector('input[name="deliveryType"]:checked').value;
+      const wallpaperId = document.getElementById('notifWallpaper').value;
+      const status = document.getElementById('notifStatusMessage');
+      const btn = document.getElementById('btnSubmitNotify');
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Dispatching...`;
+
+      try {
+        // Save notification to Firestore collection 'broadcast_notifications'
+        await db.collection('broadcast_notifications').add({
+          title: title,
+          body: body,
+          target: target,
+          targetUid: target === 'single' ? singleUid : null,
+          deliveryType: deliveryType,
+          wallpaperId: wallpaperId,
+          dispatchedAt: Date.now(),
+          sentBy: auth.currentUser ? auth.currentUser.email : 'Admin'
+        });
+
+        // Also if target is single user, push directly into user's inapp inbox
+        if (target === 'single' && singleUid) {
+          await db.collection('users').document(singleUid).collection('inapp_notifications').add({
+            title: title,
+            body: body,
+            wallpaperId: wallpaperId,
+            timestamp: Date.now(),
+            isRead: false
+          });
+        }
+
+        status.className = "mt-4 p-3 rounded-xl text-xs bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
+        status.innerHTML = `<i class="fa-solid fa-check"></i> Notification recorded and scheduled! Target: <b>${target === 'all' ? 'All Users' : singleUid}</b> (Delivery: ${deliveryType})`;
+        status.classList.remove('hidden');
+        document.getElementById('formNotify').reset();
+      } catch (err) {
+        status.className = "mt-4 p-3 rounded-xl text-xs bg-red-500/10 border border-red-500/30 text-red-400";
+        status.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> Error sending: ${err.message}`;
+        status.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane"></i> Dispatch Notification Now`;
+      }
+    }
+
+    // Load Catalog preview
+    async function loadCatalog() {
+      const grid = document.getElementById('catalogGrid');
+      grid.innerHTML = '<p class="col-span-4 text-center py-8 text-gray-500">Loading catalog...</p>';
+      try {
+        const res = await fetch('https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json?_=' + Date.now());
+        const data = await res.json();
+        grid.innerHTML = '';
+        data.forEach(item => {
+          const card = document.createElement('div');
+          card.className = "glass-card rounded-xl overflow-hidden border border-[#2E2445]";
+          card.innerHTML = `
+            <img src="${item.thumbUrl}" class="w-full h-36 object-cover bg-black" onerror="this.src='https://via.placeholder.com/300x150?text=No+Thumb'">
+            <div class="p-3">
+              <span class="text-[10px] font-bold text-[#9D4EDD] uppercase tracking-wider">${item.category}</span>
+              <h3 class="text-xs font-bold text-white truncate mt-0.5">${item.title}</h3>
+              <p class="text-[10px] text-gray-400 mt-1">${item.sizeDisplay || 'N/A'}</p>
+              <a href="${item.videoUrl}" target="_blank" class="block text-center mt-2 text-[10px] bg-[#2E2445] hover:bg-[#3D3254] text-white py-1 rounded">View Video</a>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (e) {
+        grid.innerHTML = `<p class="col-span-4 text-center py-8 text-red-400">Failed loading catalog: ${e.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>

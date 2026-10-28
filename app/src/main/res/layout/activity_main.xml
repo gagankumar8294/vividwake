@@ -27,20 +27,69 @@
                 android:fontFamily="serif"
                 android:text="Lock Screen Video"
                 android:textColor="#D4AF37"
-                android:textSize="24sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
-            <!-- User Auth / Admin Badge -->
-            <TextView
-                android:id="@+id/tvUserBadge"
+            <!-- Notification Bell Icon with Badge -->
+            <FrameLayout
+                android:id="@+id/btnNotificationCenter"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_glass_toast"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_bell"
+                    app:tint="#D4AF37" />
+
+                <TextView
+                    android:id="@+id/tvNotificationBadge"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="top|end"
+                    android:background="@drawable/bg_glass_toast"
+                    android:backgroundTint="#FF4D6D"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- User Auth / Google Sign-In Pill -->
+            <LinearLayout
+                android:id="@+id/btnUserAuth"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#261E38"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:text="Guest User"
-                android:textColor="#B0A8C0"
-                android:textSize="11sp" />
+                android:layout_height="38dp"
+                android:background="@drawable/bg_glass_toast"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp">
+
+                <ImageView
+                    android:id="@+id/ivUserAuthIcon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_google" />
+
+                <TextView
+                    android:id="@+id/tvUserAuthText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="Sign In"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView

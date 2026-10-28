@@ -2,9 +2,11 @@ package com.lockscreen.videowake
 
 import android.app.Activity
 import android.app.WallpaperManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -23,6 +25,7 @@ import android.view.Surface
 import android.view.TextureView
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -33,10 +36,12 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +55,12 @@ import java.util.Locale
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private lateinit var tvAppTitle: TextView
-    private lateinit var tvUserBadge: TextView
+    private lateinit var btnNotificationCenter: FrameLayout
+    private lateinit var tvNotificationBadge: TextView
+    private lateinit var btnUserAuth: LinearLayout
+    private lateinit var ivUserAuthIcon: ImageView
+    private lateinit var tvUserAuthText: TextView
+
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
     private lateinit var tvActiveWallpaperSubtitle: TextView
@@ -90,6 +100,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var storeAdapter: StoreWallpaperAdapter
     private lateinit var catalogRepo: CloudCatalogRepository
     private lateinit var analytics: AnalyticsManager
+    private lateinit var authManager: AuthManager
+    private lateinit var inAppNotificationManager: InAppNotificationManager
 
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
@@ -105,6 +117,31 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private var isWallpaperSelectedForApply = false
     private var selectedWallpaperItem: WallpaperItem? = null
+
+    private val notifReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateNotificationBadge()
+        }
+    }
+
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            lifecycleScope.launch {
+                val res = authManager.handleSignInResult(result.data)
+                if (res.isSuccess) {
+                    val user = res.getOrNull()
+                    val name = user?.displayName ?: "User"
+                    Toast.makeText(this@MainActivity, "Welcome, $name!", Toast.LENGTH_SHORT).show()
+                    updateUserAuthUI()
+                } else {
+                    val err = res.exceptionOrNull()?.message ?: "Unknown error"
+                    Toast.makeText(this@MainActivity, "Sign-in note: $err", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     // SAF Save Video to chosen folder
     private val saveVideoLauncher = registerForActivityResult(
@@ -137,7 +174,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         analytics = AnalyticsManager.getInstance(this)
 
         tvAppTitle = findViewById(R.id.tvAppTitle)
-        tvUserBadge = findViewById(R.id.tvUserBadge)
+        btnNotificationCenter = findViewById(R.id.btnNotificationCenter)
+        tvNotificationBadge = findViewById(R.id.tvNotificationBadge)
+        btnUserAuth = findViewById(R.id.btnUserAuth)
+        ivUserAuthIcon = findViewById(R.id.ivUserAuthIcon)
+        tvUserAuthText = findViewById(R.id.tvUserAuthText)
+
+        authManager = AuthManager(this)
+        inAppNotificationManager = InAppNotificationManager(this)
         tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
         tvActiveWallpaperSubtitle = findViewById(R.id.tvActiveWallpaperSubtitle)
@@ -508,9 +552,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
 
-        // Tap User badge to sign in / manage user
-        tvUserBadge.setOnClickListener {
+        btnUserAuth.setOnClickListener {
             showUserAuthDialog()
+        }
+
+        btnNotificationCenter.setOnClickListener {
+            showInAppNotificationsDialog()
         }
     }
 
@@ -529,8 +576,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 if (entered == CloudConfig.ADMIN_SECRET_PIN) {
                     isAdminMode = !isAdminMode
                     val modeText = if (isAdminMode) "👑 Admin Mode ENABLED" else "Guest Mode Restored"
-                    tvUserBadge.text = if (isAdminMode) "👑 Admin" else "Guest User"
-                    tvUserBadge.setBackgroundColor(if (isAdminMode) Color.parseColor("#B45309") else Color.parseColor("#261E38"))
+                    tvAppTitle.text = if (isAdminMode) "👑 VividWake (Admin)" else "Lock Screen Video"
                     Toast.makeText(this, modeText, Toast.LENGTH_SHORT).show()
                     adapter.isAdminMode = isAdminMode
                     adapter.notifyDataSetChanged()
@@ -544,27 +590,89 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun showUserAuthDialog() {
-        val currentEmail = analytics.getUserEmail() ?: ""
-        val input = EditText(this).apply {
-            hint = "Enter your email (e.g. user@gmail.com)"
-            setText(currentEmail)
+        val user = authManager.currentUser
+        if (user != null) {
+            val name = user.displayName ?: "User"
+            val email = user.email ?: ""
+            AlertDialog.Builder(this)
+                .setTitle("👤 Google Account")
+                .setMessage("Signed in as:\n$name\n($email)")
+                .setPositiveButton("Sign Out") { _, _ ->
+                    authManager.signOut {
+                        runOnUiThread {
+                            updateUserAuthUI()
+                            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        } else {
+            googleSignInLauncher.launch(authManager.getSignInIntent())
         }
+    }
 
-        AlertDialog.Builder(this)
-            .setTitle("👤 User Account")
-            .setMessage("Connect your account for personalized wallpapers & journey sync:")
-            .setView(input)
-            .setPositiveButton("Save Profile") { _, _ ->
-                val email = input.text.toString().trim()
-                if (email.isNotBlank() && email.contains("@")) {
-                    val uid = "user_" + email.substringBefore("@").replace(".", "_")
-                    analytics.linkUserToDevice(uid, email)
-                    tvUserBadge.text = "👤 ${email.substringBefore("@")}"
-                    Toast.makeText(this, "Profile connected: $email", Toast.LENGTH_SHORT).show()
+    private fun updateUserAuthUI() {
+        val user = authManager.currentUser
+        if (user != null) {
+            val firstName = user.displayName?.split(" ")?.firstOrNull() ?: user.email?.substringBefore("@") ?: "User"
+            tvUserAuthText.text = firstName
+            ivUserAuthIcon.setImageResource(R.drawable.ic_check)
+            // Listen to real-time wallpaper assignments from admin
+            authManager.listenToAssignedWallpapers { assignedList ->
+                prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
+            }
+        } else {
+            tvUserAuthText.text = "Sign In"
+            ivUserAuthIcon.setImageResource(R.drawable.ic_google)
+        }
+    }
+
+    private fun updateNotificationBadge() {
+        val count = inAppNotificationManager.getUnreadCount()
+        if (count > 0) {
+            tvNotificationBadge.visibility = View.VISIBLE
+            tvNotificationBadge.text = if (count > 9) "9+" else count.toString()
+        } else {
+            tvNotificationBadge.visibility = View.GONE
+        }
+    }
+
+    private fun showInAppNotificationsDialog() {
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_inapp_notifications, null)
+        dialog.setContentView(view)
+
+        val rv = view.findViewById<RecyclerView>(R.id.rvInAppNotifs)
+        val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyNotifs)
+        val btnClear = view.findViewById<TextView>(R.id.btnClearAllNotifs)
+
+        val list = inAppNotificationManager.getNotifications()
+        if (list.isEmpty()) {
+            tvEmpty.visibility = View.VISIBLE
+            rv.visibility = View.GONE
+        } else {
+            tvEmpty.visibility = View.GONE
+            rv.visibility = View.VISIBLE
+            rv.layoutManager = LinearLayoutManager(this)
+            val notifAdapter = InAppNotificationAdapter(list) { notif ->
+                dialog.dismiss()
+                if (!notif.wallpaperId.isNullOrBlank()) {
+                    switchToStoreTab()
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            rv.adapter = notifAdapter
+        }
+
+        btnClear.setOnClickListener {
+            inAppNotificationManager.clearAll()
+            updateNotificationBadge()
+            dialog.dismiss()
+        }
+
+        inAppNotificationManager.markAllAsRead()
+        updateNotificationBadge()
+        dialog.show()
     }
 
     private fun refreshGallery() {
@@ -691,11 +799,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
         switchMute.isChecked = isMute
-
-        val savedEmail = analytics.getUserEmail()
-        if (!savedEmail.isNullOrBlank()) {
-            tvUserBadge.text = "👤 ${savedEmail.substringBefore("@")}"
-        }
     }
 
     private fun setupListeners() {
@@ -1115,12 +1218,25 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onResume() {
         super.onResume()
+        updateNotificationBadge()
+        updateUserAuthUI()
+
+        val filter = IntentFilter(AppFirebaseMessagingService.ACTION_NEW_INAPP_NOTIFICATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(notifReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(notifReceiver, filter)
+        }
+
         if (previewSurface != null && (previewPlayer == null || !previewPlayer!!.isPlaying)) {
             playActiveVideoInPreview(repository.getActiveWallpaper())
         }
     }
 
     override fun onPause() {
+        try {
+            unregisterReceiver(notifReceiver)
+        } catch (_: Exception) {}
         stopPreviewPlayback()
         analytics.flushSync()
         super.onPause()

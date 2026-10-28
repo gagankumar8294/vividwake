@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "954237427339",
+    "project_id": "vividwake-75ad8",
+    "storage_bucket": "vividwake-75ad8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954237427339:android:0f52a9cb12be04080dbe8e",
+        "android_client_info": {
+          "package_name": "com.lockscreen.videowake"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "954237427339-p4aqjq8bv345vggv091t23a4tbf7gb41.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCxT9w5nQMaj-2pNm5asu9vnBnRV8vYapE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "954237427339-p4aqjq8bv345vggv091t23a4tbf7gb41.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
