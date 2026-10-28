@@ -124,13 +124,56 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private var authLoadingDialog: AlertDialog? = null
+
+    private fun showAuthLoading(message: String = "Connecting to Google...") {
+        if (isFinishing || isDestroyed) return
+        try {
+            if (authLoadingDialog == null) {
+                val view = layoutInflater.inflate(R.layout.dialog_auth_loading, null)
+                val tvMsg = view.findViewById<TextView>(R.id.tvLoadingMessage)
+                tvMsg.text = message
+                authLoadingDialog = AlertDialog.Builder(this)
+                    .setView(view)
+                    .setCancelable(false)
+                    .create().apply {
+                        window?.setBackgroundDrawableResource(android.R.color.transparent)
+                    }
+            } else {
+                val tvMsg = authLoadingDialog?.findViewById<TextView>(R.id.tvLoadingMessage)
+                tvMsg?.text = message
+            }
+            authLoadingDialog?.show()
+        } catch (_: Exception) {}
+    }
+
+    private fun hideAuthLoading() {
+        try {
+            authLoadingDialog?.dismiss()
+        } catch (_: Exception) {}
+        authLoadingDialog = null
+    }
+
+    private fun showAuthErrorDialog(title: String, message: String) {
+        if (isFinishing || isDestroyed) return
+        try {
+            AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show()
+        } catch (_: Exception) {}
+    }
+
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val start = System.currentTimeMillis()
-        if (result.resultCode == Activity.RESULT_OK) {
-            lifecycleScope.launch {
+        showAuthLoading("Authenticating with Google...")
+        lifecycleScope.launch {
+            try {
                 val res = authManager.handleSignInResult(result.data)
+                hideAuthLoading()
                 val duration = System.currentTimeMillis() - start
                 if (res.isSuccess) {
                     val user = res.getOrNull()
@@ -147,17 +190,24 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     updateUserAuthUI()
                 } else {
                     val err = res.exceptionOrNull()
+                    val errMsg = err?.message ?: "Sign-in could not be completed"
                     analytics.logAction("google_signin_completed", "FAILED", duration, mapOf(
-                        "error" to (err?.message ?: "unknown")
+                        "error" to errMsg
                     ), err)
                     analytics.flushSync()
-                    Toast.makeText(this@MainActivity, "Sign-in note: ${err?.message}", Toast.LENGTH_LONG).show()
+                    if (errMsg.contains("Code 12501")) {
+                        Toast.makeText(this@MainActivity, "Sign-in cancelled", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showAuthErrorDialog("Google Sign-In Alert", errMsg)
+                    }
                 }
+            } catch (e: Throwable) {
+                hideAuthLoading()
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("google_signin_completed", "FAILED", duration, mapOf("error" to (e.message ?: "unknown")), e)
+                analytics.flushSync()
+                showAuthErrorDialog("Authentication Error", e.localizedMessage ?: "Unexpected error")
             }
-        } else {
-            val duration = System.currentTimeMillis() - start
-            analytics.logAction("google_signin_completed", "FAILED", duration, mapOf("reason" to "cancelled_or_error"))
-            analytics.flushSync()
         }
     }
 
@@ -638,10 +688,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         } else {
             val start = System.currentTimeMillis()
             try {
+                showAuthLoading("Opening Google Sign-In...")
                 analytics.logAction("google_signin_button_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
                 googleSignInLauncher.launch(authManager.getSignInIntent())
             } catch (e: Exception) {
+                hideAuthLoading()
                 analytics.logAction("google_signin_button_clicked", "FAILED", System.currentTimeMillis() - start, emptyMap(), e)
+                showAuthErrorDialog("Error", "Could not open Google Sign-In: ${e.localizedMessage}")
             }
         }
     }

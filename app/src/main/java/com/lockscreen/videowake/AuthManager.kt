@@ -51,12 +51,28 @@ class AuthManager(private val context: Context) {
 
     suspend fun handleSignInResult(data: Intent?): Result<FirebaseUser> {
         return try {
+            if (data == null) {
+                return Result.failure(Exception("No authentication data received from Google Play Services."))
+            }
+
             val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-            val account = task.getResult(ApiException::class.java)
-                ?: return Result.failure(Exception("Google Sign-In returned empty account"))
+            val account = try {
+                task.getResult(ApiException::class.java)
+            } catch (apiEx: ApiException) {
+                val code = apiEx.statusCode
+                val friendlyMessage = when (code) {
+                    10 -> "Google Auth Developer Error (Code 10).\n\nThe SHA-1 certificate fingerprint must be registered in your Firebase Console.\n\nSHA-1 Fingerprint:\n37:C8:00:E6:47:36:29:AD:5F:7F:DB:22:FB:E9:75:2E:D6:FC:C7:91\n\nPlease add this fingerprint under Firebase Console -> Project Settings -> Your Apps."
+                    12500 -> "Google Sign-In failed (Code 12500).\n\nPlease verify that Google Play Services is up to date and your device has active internet."
+                    12501 -> "Sign in cancelled by user (Code 12501)."
+                    7 -> "Network connection error (Code 7).\n\nPlease check your internet connection and try again."
+                    8 -> "Internal Google Play Services error (Code 8). Please restart the app."
+                    else -> "Google Sign-In Error (Status Code: $code): ${apiEx.localizedMessage ?: "Unknown reason"}"
+                }
+                return Result.failure(Exception(friendlyMessage, apiEx))
+            } ?: return Result.failure(Exception("Google Sign-In returned empty account"))
 
             val idToken = account.idToken
-                ?: return Result.failure(Exception("Google ID Token is missing"))
+                ?: return Result.failure(Exception("Google ID Token is missing from Google account."))
 
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = auth.signInWithCredential(credential).await()
@@ -69,9 +85,10 @@ class AuthManager(private val context: Context) {
             FirebaseMessaging.getInstance().subscribeToTopic("all_users")
 
             Result.success(user)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(TAG, "Google Sign-In failed", e)
-            Result.failure(e)
+            val msg = e.localizedMessage ?: "Sign-in error: ${e::class.java.simpleName}"
+            Result.failure(Exception(msg, e))
         }
     }
 
