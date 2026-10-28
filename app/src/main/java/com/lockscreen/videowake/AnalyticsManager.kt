@@ -34,6 +34,8 @@ class AnalyticsManager private constructor(private val context: Context) {
         private const val KEY_DEVICE_ID = "pref_device_id"
         private const val KEY_USER_ID = "pref_user_id"
         private const val KEY_USER_EMAIL = "pref_user_email"
+        private const val KEY_USER_NAME = "pref_user_name"
+        private const val KEY_USER_PHOTO = "pref_user_photo"
 
         @Volatile
         private var instance: AnalyticsManager? = null
@@ -80,15 +82,24 @@ class AnalyticsManager private constructor(private val context: Context) {
         return id
     }
 
-    fun linkUserToDevice(userId: String, email: String) {
+    fun linkUserToDevice(
+        userId: String,
+        email: String,
+        userName: String = "",
+        userPhoto: String = ""
+    ) {
         prefs.edit()
             .putString(KEY_USER_ID, userId)
             .putString(KEY_USER_EMAIL, email)
+            .putString(KEY_USER_NAME, userName)
+            .putString(KEY_USER_PHOTO, userPhoto)
             .apply()
 
         logEvent("user_linked", mapOf(
             "user_id" to userId,
             "email" to email,
+            "userName" to userName,
+            "userPhoto" to userPhoto,
             "status" to "SUCCESS"
         ))
         flushSync()
@@ -96,6 +107,8 @@ class AnalyticsManager private constructor(private val context: Context) {
 
     fun getUserId(): String? = prefs.getString(KEY_USER_ID, null)
     fun getUserEmail(): String? = prefs.getString(KEY_USER_EMAIL, null)
+    fun getUserName(): String? = prefs.getString(KEY_USER_NAME, null)
+    fun getUserPhoto(): String? = prefs.getString(KEY_USER_PHOTO, null)
 
     @Synchronized
     fun logEvent(eventType: String, properties: Map<String, Any> = emptyMap()) {
@@ -211,6 +224,8 @@ class AnalyticsManager private constructor(private val context: Context) {
                     put("deviceId", deviceId)
                     put("userId", getUserId() ?: "")
                     put("email", getUserEmail() ?: "")
+                    put("userName", getUserName() ?: "")
+                    put("userPhoto", getUserPhoto() ?: "")
                     put("deviceBrand", Build.MANUFACTURER)
                     put("deviceModel", Build.MODEL)
                     put("osVersion", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")

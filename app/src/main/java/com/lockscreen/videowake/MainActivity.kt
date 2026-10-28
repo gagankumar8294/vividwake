@@ -191,7 +191,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 if (res.isSuccess) {
                     val user = res.getOrNull()
                     if (user != null) {
-                        analytics.linkUserToDevice(user.uid, user.email ?: "")
+                        analytics.linkUserToDevice(
+                            user.uid,
+                            user.email ?: "",
+                            user.displayName ?: "",
+                            user.photoUrl?.toString() ?: ""
+                        )
                     }
                     val name = user?.displayName ?: "User"
                     analytics.logAction("google_signin_completed", "SUCCESS", duration, mapOf(
@@ -849,7 +854,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             tvProfileCardEmail.text = email
             loadProfileAvatar(user.photoUrl?.toString(), displayName, ivProfileCardAvatar, tvProfileCardInitial)
 
-            analytics.linkUserToDevice(user.uid, email)
+            analytics.linkUserToDevice(
+                user.uid,
+                email,
+                displayName,
+                user.photoUrl?.toString() ?: ""
+            )
             // Listen to real-time wallpaper assignments from admin
             authManager.listenToAssignedWallpapers { assignedList ->
                 prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
