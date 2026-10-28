@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.SurfaceTexture
@@ -47,6 +48,8 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -60,6 +63,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var btnUserAuth: LinearLayout
     private lateinit var ivUserAuthIcon: ImageView
     private lateinit var tvUserAuthText: TextView
+    private lateinit var ivUserAuthPhoto: ImageView
+    private lateinit var tvUserAuthInitial: TextView
+
+    // DriveNotes Style Profile Header Card
+    private lateinit var cardUserProfile: View
+    private lateinit var ivProfileCardAvatar: ImageView
+    private lateinit var tvProfileCardInitial: TextView
+    private lateinit var tvProfileCardName: TextView
+    private lateinit var tvProfileCardEmail: TextView
+    private lateinit var tvProfileCardBadge: TextView
 
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
@@ -247,6 +260,19 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnUserAuth = findViewById(R.id.btnUserAuth)
         ivUserAuthIcon = findViewById(R.id.ivUserAuthIcon)
         tvUserAuthText = findViewById(R.id.tvUserAuthText)
+        ivUserAuthPhoto = findViewById(R.id.ivUserAuthPhoto)
+        tvUserAuthInitial = findViewById(R.id.tvUserAuthInitial)
+
+        cardUserProfile = findViewById(R.id.cardUserProfile)
+        ivProfileCardAvatar = findViewById(R.id.ivProfileCardAvatar)
+        tvProfileCardInitial = findViewById(R.id.tvProfileCardInitial)
+        tvProfileCardName = findViewById(R.id.tvProfileCardName)
+        tvProfileCardEmail = findViewById(R.id.tvProfileCardEmail)
+        tvProfileCardBadge = findViewById(R.id.tvProfileCardBadge)
+
+        cardUserProfile.setOnClickListener {
+            showAccountProfileDialog()
+        }
 
         authManager = AuthManager(this)
         inAppNotificationManager = InAppNotificationManager(this)
@@ -663,15 +689,112 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .show()
     }
 
-    private fun showUserAuthDialog() {
-        val user = authManager.currentUser
-        if (user != null) {
-            val name = user.displayName ?: "User"
-            val email = user.email ?: ""
+    private fun loadProfileAvatar(
+        photoUrl: String?,
+        displayName: String?,
+        imageView: ImageView,
+        fallbackInitial: TextView
+    ) {
+        val initial = (displayName?.takeIf { it.isNotBlank() } ?: "U").first().uppercase()
+        fallbackInitial.text = initial
+
+        if (photoUrl.isNullOrBlank()) {
+            imageView.visibility = View.GONE
+            fallbackInitial.visibility = View.VISIBLE
+            return
+        }
+
+        // Show fallback letter initially while image loads in background
+        imageView.visibility = View.GONE
+        fallbackInitial.visibility = View.VISIBLE
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder().url(photoUrl).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val bytes = response.body?.bytes()
+                        if (bytes != null && bytes.isNotEmpty()) {
+                            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            withContext(Dispatchers.Main) {
+                                if (!isFinishing && !isDestroyed) {
+                                    imageView.setImageBitmap(bitmap)
+                                    imageView.visibility = View.VISIBLE
+                                    fallbackInitial.visibility = View.GONE
+                                }
+                            }
+                            return@launch
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // If offline or network issue, fallback initial remains visible
+            }
+            withContext(Dispatchers.Main) {
+                if (!isFinishing && !isDestroyed && imageView.drawable == null) {
+                    imageView.visibility = View.GONE
+                    fallbackInitial.visibility = View.VISIBLE
+                }
+            }
+        }
+    }
+
+    private fun showAccountProfileDialog() {
+        val user = authManager.currentUser ?: return
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_account_profile, null)
+        dialog.setContentView(view)
+
+        val ivAvatar = view.findViewById<ImageView>(R.id.dialogIvUserAvatar)
+        val tvInitial = view.findViewById<TextView>(R.id.dialogTvAvatarInitial)
+        val tvName = view.findViewById<TextView>(R.id.dialogTvUserName)
+        val tvEmail = view.findViewById<TextView>(R.id.dialogTvUserEmail)
+        val tvAssigned = view.findViewById<TextView>(R.id.dialogTvAssignedCount)
+        val btnClose = view.findViewById<TextView>(R.id.btnCloseProfileDialog)
+        val btnSwitch = view.findViewById<MaterialButton>(R.id.dialogBtnSwitchAccount)
+        val btnSignOut = view.findViewById<MaterialButton>(R.id.dialogBtnSignOut)
+
+        val name = user.displayName ?: "User"
+        val email = user.email ?: ""
+        tvName.text = name
+        tvEmail.text = email
+
+        loadProfileAvatar(user.photoUrl?.toString(), name, ivAvatar, tvInitial)
+
+        val assignedCount = prefs.getStringSet("assigned_wallpaper_ids", emptySet())?.size ?: 0
+        tvAssigned.text = if (assignedCount > 0) "$assignedCount Assigned" else "0 Assigned (Public Catalog)"
+
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnSwitch.setOnClickListener {
+            dialog.dismiss()
+            val start = System.currentTimeMillis()
+            authManager.signOut {
+                analytics.linkUserToDevice("", "")
+                analytics.logAction("switch_account_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
+                analytics.flushSync()
+                runOnUiThread {
+                    updateUserAuthUI()
+                    try {
+                        showAuthLoading("Opening Google Sign-In...")
+                        googleSignInLauncher.launch(authManager.getSignInIntent())
+                    } catch (e: Exception) {
+                        hideAuthLoading()
+                        showAuthErrorDialog("Error", "Could not launch Google Sign-In: ${e.localizedMessage}")
+                    }
+                }
+            }
+        }
+
+        btnSignOut.setOnClickListener {
             AlertDialog.Builder(this)
-                .setTitle("👤 Google Account")
-                .setMessage("Signed in as:\n$name\n($email)")
+                .setTitle("Sign Out")
+                .setMessage("Are you sure you want to sign out of your Google account?")
                 .setPositiveButton("Sign Out") { _, _ ->
+                    dialog.dismiss()
                     val start = System.currentTimeMillis()
                     authManager.signOut {
                         analytics.linkUserToDevice("", "")
@@ -683,8 +806,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                         }
                     }
                 }
-                .setNegativeButton("Close", null)
+                .setNegativeButton("Cancel", null)
                 .show()
+        }
+
+        dialog.show()
+    }
+
+    private fun showUserAuthDialog() {
+        val user = authManager.currentUser
+        if (user != null) {
+            showAccountProfileDialog()
         } else {
             val start = System.currentTimeMillis()
             try {
@@ -702,17 +834,35 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun updateUserAuthUI() {
         val user = authManager.currentUser
         if (user != null) {
-            val firstName = user.displayName?.split(" ")?.firstOrNull() ?: user.email?.substringBefore("@") ?: "User"
+            val displayName = user.displayName ?: user.email?.substringBefore("@") ?: "User"
+            val email = user.email ?: ""
+            val firstName = displayName.split(" ").firstOrNull() ?: displayName
+
+            // Header Pill Button
             tvUserAuthText.text = firstName
-            ivUserAuthIcon.setImageResource(R.drawable.ic_check)
-            analytics.linkUserToDevice(user.uid, user.email ?: "")
+            ivUserAuthIcon.visibility = View.GONE
+            loadProfileAvatar(user.photoUrl?.toString(), displayName, ivUserAuthPhoto, tvUserAuthInitial)
+
+            // DriveNotes Style User Profile Header Card
+            cardUserProfile.visibility = View.VISIBLE
+            tvProfileCardName.text = displayName
+            tvProfileCardEmail.text = email
+            loadProfileAvatar(user.photoUrl?.toString(), displayName, ivProfileCardAvatar, tvProfileCardInitial)
+
+            analytics.linkUserToDevice(user.uid, email)
             // Listen to real-time wallpaper assignments from admin
             authManager.listenToAssignedWallpapers { assignedList ->
                 prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
             }
         } else {
+            // Header Pill Button
             tvUserAuthText.text = "Sign In"
-            ivUserAuthIcon.setImageResource(R.drawable.ic_google)
+            ivUserAuthIcon.visibility = View.VISIBLE
+            ivUserAuthPhoto.visibility = View.GONE
+            tvUserAuthInitial.visibility = View.GONE
+
+            // Hide Profile Card
+            cardUserProfile.visibility = View.GONE
         }
     }
 
