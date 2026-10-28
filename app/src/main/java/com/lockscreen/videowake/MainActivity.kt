@@ -132,6 +132,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val res = authManager.handleSignInResult(result.data)
                 if (res.isSuccess) {
                     val user = res.getOrNull()
+                    if (user != null) {
+                        analytics.linkUserToDevice(user.uid, user.email ?: "")
+                    }
                     val name = user?.displayName ?: "User"
                     Toast.makeText(this@MainActivity, "Welcome, $name!", Toast.LENGTH_SHORT).show()
                     updateUserAuthUI()
@@ -599,6 +602,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setMessage("Signed in as:\n$name\n($email)")
                 .setPositiveButton("Sign Out") { _, _ ->
                     authManager.signOut {
+                        analytics.linkUserToDevice("", "")
                         runOnUiThread {
                             updateUserAuthUI()
                             Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
@@ -618,6 +622,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val firstName = user.displayName?.split(" ")?.firstOrNull() ?: user.email?.substringBefore("@") ?: "User"
             tvUserAuthText.text = firstName
             ivUserAuthIcon.setImageResource(R.drawable.ic_check)
+            analytics.linkUserToDevice(user.uid, user.email ?: "")
             // Listen to real-time wallpaper assignments from admin
             authManager.listenToAssignedWallpapers { assignedList ->
                 prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
