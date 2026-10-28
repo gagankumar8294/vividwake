@@ -127,22 +127,37 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        val start = System.currentTimeMillis()
         if (result.resultCode == Activity.RESULT_OK) {
             lifecycleScope.launch {
                 val res = authManager.handleSignInResult(result.data)
+                val duration = System.currentTimeMillis() - start
                 if (res.isSuccess) {
                     val user = res.getOrNull()
                     if (user != null) {
                         analytics.linkUserToDevice(user.uid, user.email ?: "")
                     }
                     val name = user?.displayName ?: "User"
+                    analytics.logAction("google_signin_completed", "SUCCESS", duration, mapOf(
+                        "uid" to (user?.uid ?: ""),
+                        "email" to (user?.email ?: "")
+                    ))
+                    analytics.flushSync()
                     Toast.makeText(this@MainActivity, "Welcome, $name!", Toast.LENGTH_SHORT).show()
                     updateUserAuthUI()
                 } else {
-                    val err = res.exceptionOrNull()?.message ?: "Unknown error"
-                    Toast.makeText(this@MainActivity, "Sign-in note: $err", Toast.LENGTH_LONG).show()
+                    val err = res.exceptionOrNull()
+                    analytics.logAction("google_signin_completed", "FAILED", duration, mapOf(
+                        "error" to (err?.message ?: "unknown")
+                    ), err)
+                    analytics.flushSync()
+                    Toast.makeText(this@MainActivity, "Sign-in note: ${err?.message}", Toast.LENGTH_LONG).show()
                 }
             }
+        } else {
+            val duration = System.currentTimeMillis() - start
+            analytics.logAction("google_signin_completed", "FAILED", duration, mapOf("reason" to "cancelled_or_error"))
+            analytics.flushSync()
         }
     }
 
@@ -322,7 +337,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         btnRefreshStore.setOnClickListener {
-            loadStoreCatalog()
+            val start = System.currentTimeMillis()
+            try {
+                loadStoreCatalog()
+                analytics.logAction("refresh_store_click", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
+            } catch (e: Exception) {
+                analytics.logAction("refresh_store_click", "FAILED", System.currentTimeMillis() - start, emptyMap(), e)
+            }
         }
     }
 
@@ -601,8 +622,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setTitle("👤 Google Account")
                 .setMessage("Signed in as:\n$name\n($email)")
                 .setPositiveButton("Sign Out") { _, _ ->
+                    val start = System.currentTimeMillis()
                     authManager.signOut {
                         analytics.linkUserToDevice("", "")
+                        analytics.logAction("sign_out_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
+                        analytics.flushSync()
                         runOnUiThread {
                             updateUserAuthUI()
                             Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
@@ -612,7 +636,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setNegativeButton("Close", null)
                 .show()
         } else {
-            googleSignInLauncher.launch(authManager.getSignInIntent())
+            val start = System.currentTimeMillis()
+            try {
+                analytics.logAction("google_signin_button_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
+                googleSignInLauncher.launch(authManager.getSignInIntent())
+            } catch (e: Exception) {
+                analytics.logAction("google_signin_button_clicked", "FAILED", System.currentTimeMillis() - start, emptyMap(), e)
+            }
         }
     }
 
@@ -644,6 +674,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun showInAppNotificationsDialog() {
+        val bellStart = System.currentTimeMillis()
+        val count = inAppNotificationManager.getUnreadCount()
+        analytics.logAction("notification_bell_clicked", "SUCCESS", System.currentTimeMillis() - bellStart, mapOf("unreadCount" to count))
+
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.dialog_inapp_notifications, null)
         dialog.setContentView(view)
@@ -661,6 +695,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             rv.visibility = View.VISIBLE
             rv.layoutManager = LinearLayoutManager(this)
             val notifAdapter = InAppNotificationAdapter(list) { notif ->
+                val clickStart = System.currentTimeMillis()
+                analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
+                    "notifId" to notif.id,
+                    "title" to notif.title,
+                    "wallpaperId" to (notif.wallpaperId ?: "")
+                ))
                 dialog.dismiss()
                 if (!notif.wallpaperId.isNullOrBlank()) {
                     switchToStoreTab()
@@ -670,7 +710,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         btnClear.setOnClickListener {
+            val clearStart = System.currentTimeMillis()
+            val cleared = inAppNotificationManager.getNotifications().size
             inAppNotificationManager.clearAll()
+            analytics.logAction("notification_clear_all_clicked", "SUCCESS", System.currentTimeMillis() - clearStart, mapOf("clearedCount" to cleared))
             updateNotificationBadge()
             dialog.dismiss()
         }
@@ -847,54 +890,95 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         btnDirectGalleryHandOff.setOnClickListener {
+            val start = System.currentTimeMillis()
             val activeItem = repository.getActiveWallpaper()
-            val uri = getActiveVideoUri(activeItem)
-            if (uri != null) {
-                launchGalleryVideo(uri)
-            } else {
-                Toast.makeText(this, "Could not prepare video file", Toast.LENGTH_SHORT).show()
+            try {
+                val uri = getActiveVideoUri(activeItem)
+                if (uri != null) {
+                    launchGalleryVideo(uri)
+                    val duration = System.currentTimeMillis() - start
+                    analytics.logAction("direct_gallery_handoff_click", "SUCCESS", duration, mapOf("title" to activeItem.title))
+                } else {
+                    val duration = System.currentTimeMillis() - start
+                    analytics.logAction("direct_gallery_handoff_click", "FAILED", duration, mapOf("reason" to "video_uri_null"))
+                    Toast.makeText(this, "Could not prepare video file", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("direct_gallery_handoff_click", "FAILED", duration, mapOf("title" to activeItem.title), e)
             }
         }
 
         btnClearLockOverride.setOnClickListener {
-            clearLockScreenOverrideSilently()
-            Toast.makeText(this, "Cleared lock photo override! Select 'Home screen and lock screen' in preview", Toast.LENGTH_LONG).show()
-            openLiveWallpaperChooser()
+            val start = System.currentTimeMillis()
+            try {
+                clearLockScreenOverrideSilently()
+                openLiveWallpaperChooser()
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("clear_lock_override_click", "SUCCESS", duration, emptyMap())
+                Toast.makeText(this, "Cleared lock photo override! Select 'Home screen and lock screen' in preview", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("clear_lock_override_click", "FAILED", duration, emptyMap(), e)
+            }
         }
 
         btnExportVideo.setOnClickListener {
-            promptSaveVideoLocation()
+            val start = System.currentTimeMillis()
+            try {
+                promptSaveVideoLocation()
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("export_video_click", "SUCCESS", duration, emptyMap())
+            } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("export_video_click", "FAILED", duration, emptyMap(), e)
+            }
         }
 
         rgPlaybackMode.setOnCheckedChangeListener { _, checkedId ->
-            val mode = when (checkedId) {
-                R.id.rbLoopLockOnly -> VideoWallpaperService.MODE_LOOP_LOCK_ONLY
-                R.id.rbLoopAlways -> VideoWallpaperService.MODE_LOOP_ALWAYS
-                else -> VideoWallpaperService.MODE_WAKE_FREEZE
+            val start = System.currentTimeMillis()
+            try {
+                val mode = when (checkedId) {
+                    R.id.rbLoopLockOnly -> VideoWallpaperService.MODE_LOOP_LOCK_ONLY
+                    R.id.rbLoopAlways -> VideoWallpaperService.MODE_LOOP_ALWAYS
+                    else -> VideoWallpaperService.MODE_WAKE_FREEZE
+                }
+                val isLoop = (mode != VideoWallpaperService.MODE_WAKE_FREEZE)
+
+                prefs.edit()
+                    .putInt(VideoWallpaperService.KEY_PLAYBACK_MODE, mode)
+                    .putBoolean(VideoWallpaperService.KEY_LOOP, isLoop)
+                    .apply()
+
+                updateSubtitle(repository.getActiveWallpaper())
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("change_playback_mode", "SUCCESS", duration, mapOf("mode" to mode, "isLoop" to isLoop))
+
+                val msg = when (mode) {
+                    VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> "Mode: Loop on Lock Screen (Pauses on Home Screen - 100% Smooth)"
+                    VideoWallpaperService.MODE_LOOP_ALWAYS -> "Mode: Loop Always (Lock & Home Screen)"
+                    else -> "Mode: Wake Animation (Freeze on End Frame - 0% Battery)"
+                }
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("change_playback_mode", "FAILED", duration, emptyMap(), e)
             }
-            val isLoop = (mode != VideoWallpaperService.MODE_WAKE_FREEZE)
-
-            prefs.edit()
-                .putInt(VideoWallpaperService.KEY_PLAYBACK_MODE, mode)
-                .putBoolean(VideoWallpaperService.KEY_LOOP, isLoop)
-                .apply()
-
-            updateSubtitle(repository.getActiveWallpaper())
-            analytics.logEvent("change_playback_mode", mapOf("mode" to mode))
-
-            val msg = when (mode) {
-                VideoWallpaperService.MODE_LOOP_LOCK_ONLY -> "Mode: Loop on Lock Screen (Pauses on Home Screen - 100% Smooth)"
-                VideoWallpaperService.MODE_LOOP_ALWAYS -> "Mode: Loop Always (Lock & Home Screen)"
-                else -> "Mode: Wake Animation (Freeze on End Frame - 0% Battery)"
-            }
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
         }
 
         switchMute.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean(VideoWallpaperService.KEY_MUTE, isChecked).apply()
-            previewPlayer?.let {
-                val vol = if (isChecked) 0f else 1f
-                it.setVolume(vol, vol)
+            val start = System.currentTimeMillis()
+            try {
+                prefs.edit().putBoolean(VideoWallpaperService.KEY_MUTE, isChecked).apply()
+                previewPlayer?.let {
+                    val vol = if (isChecked) 0f else 1f
+                    it.setVolume(vol, vol)
+                }
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("toggle_audio_mute", "SUCCESS", duration, mapOf("isMuted" to isChecked))
+            } catch (e: Exception) {
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("toggle_audio_mute", "FAILED", duration, mapOf("isMuted" to isChecked), e)
             }
         }
     }
