@@ -87,6 +87,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var layoutStoreSkeleton: View
     private lateinit var btnRefreshStore: MaterialButton
     private lateinit var tvStoreCatalogHeader: TextView
+    private lateinit var nestedScrollViewMain: androidx.core.widget.NestedScrollView
+    private lateinit var chipGroupStoreCategories: com.google.android.material.chip.ChipGroup
+    private lateinit var pbStoreLoadMore: ProgressBar
+
+    // Explore Store Pagination & Filter State
+    private var fullCatalogList: List<WallpaperItem> = emptyList()
+    private var filteredCatalogList: List<WallpaperItem> = emptyList()
+    private var currentStoreCategory: String = "All"
+    private var currentStorePage: Int = 0
+    private val STORE_PAGE_SIZE: Int = 20
+    private var isStoreLoadingMore: Boolean = false
 
     // Action Buttons
     private lateinit var btnSetWallpaper: MaterialButton
@@ -280,6 +291,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         layoutStoreSkeleton = findViewById(R.id.layoutStoreSkeleton)
         btnRefreshStore = findViewById(R.id.btnRefreshStore)
         tvStoreCatalogHeader = findViewById(R.id.tvStoreCatalogHeader)
+        nestedScrollViewMain = findViewById(R.id.nestedScrollViewMain)
+        chipGroupStoreCategories = findViewById(R.id.chipGroupStoreCategories)
+        pbStoreLoadMore = findViewById(R.id.pbStoreLoadMore)
 
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
         btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
@@ -503,6 +517,19 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         rvStoreWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         rvStoreWallpapers.adapter = storeAdapter
+
+        // Fetch on scroll: when scrolling near bottom of NestedScrollView, load next page chunk
+        nestedScrollViewMain.setOnScrollChangeListener(androidx.core.widget.NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
+            if (layoutExploreStore.visibility == View.VISIBLE && !isStoreLoadingMore && (currentStorePage * STORE_PAGE_SIZE < filteredCatalogList.size)) {
+                val child = v.getChildAt(0)
+                if (child != null) {
+                    val diff = child.bottom - (v.height + scrollY)
+                    if (diff <= 1000) {
+                        loadNextStorePage()
+                    }
+                }
+            }
+        })
     }
 
     private fun loadStoreCatalog() {
@@ -513,19 +540,22 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         rvStoreWallpapers.visibility = View.GONE
         lifecycleScope.launch {
             try {
-                val list = catalogRepo.fetchCatalog(isAdminMode)
+                fullCatalogList = catalogRepo.fetchCatalog(isAdminMode)
                 layoutStoreSkeleton.clearAnimation()
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
-                storeAdapter.submitList(list)
+
+                setupStoreCategoryChips()
+                applyCategoryFilter(currentStoreCategory)
+
                 if (isAdminMode) {
-                    tvStoreCatalogHeader.text = "👑 ADMIN CATALOG (${list.size} wallpapers, drafts visible)"
+                    tvStoreCatalogHeader.text = "👑 ADMIN CATALOG (${fullCatalogList.size} wallpapers, drafts visible)"
                 } else {
                     tvStoreCatalogHeader.text = "Tap card to stream preview. Download to set as wallpaper."
                 }
                 val duration = System.currentTimeMillis() - start
                 analytics.logAction("store_catalog_fetch", "SUCCESS", duration, mapOf(
-                    "count" to list.size,
+                    "count" to fullCatalogList.size,
                     "isAdminMode" to isAdminMode
                 ))
             } catch (e: Exception) {
@@ -537,6 +567,65 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     "isAdminMode" to isAdminMode
                 ), e)
             }
+        }
+    }
+
+    private fun setupStoreCategoryChips() {
+        chipGroupStoreCategories.removeAllViews()
+        val distinctCategories = fullCatalogList.map { it.category }.filter { it.isNotBlank() }.distinct()
+        val categories = listOf("All") + distinctCategories
+
+        for (cat in categories) {
+            val count = if (cat == "All") fullCatalogList.size else fullCatalogList.count { it.category.equals(cat, ignoreCase = true) }
+            val chip = com.google.android.material.chip.Chip(this).apply {
+                text = "$cat ($count)"
+                isCheckable = true
+                isChecked = (cat == currentStoreCategory)
+                chipBackgroundColor = android.content.res.ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(android.graphics.Color.parseColor("#D4AF37"), android.graphics.Color.parseColor("#261E38"))
+                )
+                setTextColor(android.content.res.ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(android.graphics.Color.parseColor("#0E0B16"), android.graphics.Color.parseColor("#B0A8C0"))
+                ))
+                chipStrokeWidth = 1f
+                chipStrokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#3A2F4C"))
+                setOnClickListener {
+                    applyCategoryFilter(cat)
+                }
+            }
+            chipGroupStoreCategories.addView(chip)
+        }
+    }
+
+    private fun applyCategoryFilter(category: String) {
+        currentStoreCategory = category
+        currentStorePage = 0
+        filteredCatalogList = if (category == "All") {
+            fullCatalogList
+        } else {
+            fullCatalogList.filter { it.category.equals(category, ignoreCase = true) }
+        }
+        val firstBatch = filteredCatalogList.take(STORE_PAGE_SIZE)
+        storeAdapter.submitInitialList(firstBatch)
+        currentStorePage = 1
+    }
+
+    private fun loadNextStorePage() {
+        if (isStoreLoadingMore) return
+        val startIndex = currentStorePage * STORE_PAGE_SIZE
+        if (startIndex >= filteredCatalogList.size) return
+
+        isStoreLoadingMore = true
+        pbStoreLoadMore.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(100) // gentle debounce
+            val nextBatch = filteredCatalogList.drop(startIndex).take(STORE_PAGE_SIZE)
+            storeAdapter.appendList(nextBatch)
+            currentStorePage++
+            isStoreLoadingMore = false
+            pbStoreLoadMore.visibility = View.GONE
         }
     }
 

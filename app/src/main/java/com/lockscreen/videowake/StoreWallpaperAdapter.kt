@@ -75,15 +75,24 @@ class StoreWallpaperAdapter(
     private val downloadingProgressMap = mutableMapOf<String, Int>()
 
     fun submitList(catalogItems: List<WallpaperItem>) {
+        submitInitialList(catalogItems)
+    }
+
+    fun submitInitialList(items: List<WallpaperItem>) {
         rows.clear()
-        // Group by category dynamically based on JSON records
-        val grouped = catalogItems.groupBy { it.category.ifBlank { "General" } }
-        grouped.forEach { (catName, itemsInCat) ->
-            rows.add(StoreRow.Header(catName, itemsInCat.size))
-            itemsInCat.forEach { item ->
-                rows.add(StoreRow.Item(item))
-            }
-        }
+        items.forEach { rows.add(StoreRow.Item(it)) }
+        notifyDataSetChanged()
+    }
+
+    fun appendList(newItems: List<WallpaperItem>) {
+        if (newItems.isEmpty()) return
+        val startPos = rows.size
+        newItems.forEach { rows.add(StoreRow.Item(it)) }
+        notifyItemRangeInserted(startPos, newItems.size)
+    }
+
+    fun clearList() {
+        rows.clear()
         notifyDataSetChanged()
     }
 
@@ -136,6 +145,13 @@ class StoreWallpaperAdapter(
         }
     }
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        if (holder is StoreViewHolder) {
+            holder.cancelThumbnail()
+        }
+        super.onViewRecycled(holder)
+    }
+
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
             is StoreRow.Header -> (holder as CategoryHeaderViewHolder).bind(row.categoryName, row.count)
@@ -178,6 +194,11 @@ class StoreWallpaperAdapter(
 
         private var thumbJob: Job? = null
         private val analytics = AnalyticsManager.getInstance(context)
+
+        fun cancelThumbnail() {
+            thumbJob?.cancel()
+            thumbJob = null
+        }
 
         fun bind(item: WallpaperItem) {
             tvTitle.text = item.title
@@ -280,7 +301,7 @@ class StoreWallpaperAdapter(
                     val bitmap = withContext(Dispatchers.IO) {
                         if (cacheFile.exists() && cacheFile.length() > 0) {
                             try {
-                                val diskBmp = decodeSampledBitmapFromFile(cacheFile.absolutePath, 480, 480)
+                                val diskBmp = decodeSampledBitmapFromFile(cacheFile.absolutePath, 240, 320)
                                 if (diskBmp != null) return@withContext diskBmp
                             } catch (_: Throwable) {}
                         }
@@ -296,7 +317,7 @@ class StoreWallpaperAdapter(
                                         try {
                                             cacheFile.writeBytes(bytes)
                                         } catch (_: Exception) {}
-                                        return@withContext decodeSampledBitmap(bytes, 480, 480)
+                                        return@withContext decodeSampledBitmap(bytes, 240, 320)
                                     }
                                 }
                             }

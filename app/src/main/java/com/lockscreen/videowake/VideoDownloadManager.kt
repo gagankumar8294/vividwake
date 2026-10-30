@@ -179,7 +179,7 @@ class VideoDownloadManager(private val context: Context) {
         return File(cloudWallpapersDir, "cloud_${safeName}.mp4")
     }
 
-    private fun getDownloadedIds(): Set<String> {
+    fun getDownloadedIds(): Set<String> {
         val jsonStr = prefs.getString(KEY_DOWNLOADED_IDS, "[]") ?: "[]"
         return try {
             val arr = JSONArray(jsonStr)

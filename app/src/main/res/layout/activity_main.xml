@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nestedScrollViewMain"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0E0B16"
@@ -297,6 +298,24 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
+            <!-- Horizontal Category Filter Bar -->
+            <HorizontalScrollView
+                android:id="@+id/hsvStoreCategories"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupStoreCategories"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true"
+                    app:singleSelection="true"
+                    app:selectionRequired="true" />
+            </HorizontalScrollView>
+
             <!-- Skeleton Loading Container -->
             <LinearLayout
                 android:id="@+id/layoutStoreSkeleton"
@@ -319,6 +338,17 @@
                 android:clipToPadding="false"
                 android:nestedScrollingEnabled="false"
                 android:overScrollMode="never" />
+
+            <!-- Paging Loading Spinner -->
+            <ProgressBar
+                android:id="@+id/pbStoreLoadMore"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="16dp"
+                android:indeterminateTint="#D4AF37"
+                android:visibility="gone" />
         </LinearLayout>
 
         <!-- Device Detection & Smart Action Section -->

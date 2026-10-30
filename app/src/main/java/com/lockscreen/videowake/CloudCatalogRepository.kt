@@ -89,6 +89,7 @@ class CloudCatalogRepository(
     private fun parseCatalog(jsonString: String, isAdminMode: Boolean): List<WallpaperItem> {
         val list = mutableListOf<WallpaperItem>()
         try {
+            val downloadedIds = downloadManager.getDownloadedIds()
             val jsonArray = JSONArray(jsonString)
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
@@ -123,7 +124,12 @@ class CloudCatalogRepository(
                     continue
                 }
 
-                val isDownloaded = downloadManager.isDownloaded(id)
+                val isDownloaded = if (downloadedIds.contains(id)) {
+                    val f = downloadManager.getLocalVideoFile(id)
+                    f.exists() && f.length() > 0
+                } else {
+                    false
+                }
                 val localPath = if (isDownloaded) downloadManager.getLocalVideoFile(id).absolutePath else ""
 
                 list.add(
