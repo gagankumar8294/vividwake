@@ -86,11 +86,12 @@ class WallpaperRepository(private val context: Context) {
             val files = cloudDir.listFiles { f -> f.extension.equals("mp4", ignoreCase = true) }
             if (files != null) {
                 for (f in files) {
-                    val id = f.nameWithoutExtension.removePrefix("cloud_")
+                    val rawId = f.nameWithoutExtension.removePrefix("cloud_")
                     list.add(
                         WallpaperItem(
-                            id = "cloud_$id",
-                            title = id.replace("_", " ").capitalizeWords().take(22),
+                            id = "cloud_$rawId",
+                            cloudId = rawId,
+                            title = rawId.replace("_", " ").capitalizeWords().take(22),
                             isPreset = false,
                             filePath = f.absolutePath,
                             isCloud = true,
@@ -226,8 +227,25 @@ class WallpaperRepository(private val context: Context) {
             setActiveWallpaper(getPresetWallpapers().first())
         }
 
-        if (item.isCloud) {
-            return downloadManager.deleteLocalDownload(item.cloudId.ifBlank { item.id })
+        // Delete cloud download if it's cloud OR if its file resides in cloudWallpapersDir
+        val isInCloudDir = item.filePath.contains(CloudConfig.FOLDER_CLOUD_WALLPAPERS)
+        if (item.isCloud || isInCloudDir) {
+            // Try cloudId first, then un-prefixed id, then raw id
+            val targetId = when {
+                item.cloudId.isNotBlank() -> item.cloudId
+                item.id.startsWith("cloud_") -> item.id.removePrefix("cloud_")
+                else -> item.id
+            }
+            // Explicitly delete file directly as safety net
+            try {
+                if (item.filePath.isNotEmpty()) {
+                    val directFile = File(item.filePath)
+                    if (directFile.exists()) directFile.delete()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error direct deleting file: ${item.filePath}", e)
+            }
+            return downloadManager.deleteLocalDownload(targetId)
         }
 
         try {

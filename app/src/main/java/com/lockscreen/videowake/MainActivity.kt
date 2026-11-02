@@ -1081,14 +1081,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .setTitle("Delete Wallpaper")
             .setMessage("Remove '${item.title}' from your gallery?")
             .setPositiveButton("Delete") { _, _ ->
+                val start = System.currentTimeMillis()
                 repository.deleteWallpaper(item)
+
+                // Sync state with Explore Store so it shows the Download icon again
+                val cloudId = item.cloudId.ifBlank { item.id.removePrefix("cloud_") }
+                val updatedStoreItem = item.copy(id = cloudId, filePath = "", isDownloaded = false)
+                storeAdapter.updateItem(updatedStoreItem)
+
                 refreshGallery()
                 if (selectedWallpaperItem?.id == item.id) {
                     setApplyButtonState(isSelected = false, item = null)
                 }
                 val current = repository.getActiveWallpaper()
                 playActiveVideoInPreview(current)
-                // Silent delete - no toast alert as requested
+
+                val duration = System.currentTimeMillis() - start
+                analytics.logAction("delete_wallpaper", "SUCCESS", duration, mapOf(
+                    "id" to item.id,
+                    "title" to item.title,
+                    "isCloud" to item.isCloud
+                ))
             }
             .setNegativeButton("Cancel", null)
             .show()
