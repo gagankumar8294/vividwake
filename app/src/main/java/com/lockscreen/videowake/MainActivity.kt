@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var catalogRepo: CloudCatalogRepository
     private lateinit var analytics: AnalyticsManager
     private lateinit var authManager: AuthManager
+    private lateinit var deviceLockManager: DeviceLockManager
     private lateinit var inAppNotificationManager: InAppNotificationManager
 
     private var previewPlayer: MediaPlayer? = null
@@ -189,10 +190,40 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         lifecycleScope.launch {
             try {
                 val res = authManager.handleSignInResult(result.data)
-                hideAuthLoading()
                 val duration = System.currentTimeMillis() - start
                 if (res.isSuccess) {
                     val user = res.getOrNull()
+                    val userEmail = user?.email ?: ""
+                    val userId = user?.uid ?: ""
+
+                    // 🔒 Enforce Strict 1-Phone = 1-Email Device Security Check
+                    showAuthLoading("Verifying device security...")
+                    val verifyResult = deviceLockManager.verifyBinding(userEmail, userId)
+                    hideAuthLoading()
+
+                    when (verifyResult) {
+                        is DeviceVerificationResult.Blocked -> {
+                            // Device or Email is bound to someone else!
+                            // Immediately sign out to prevent unauthorized access
+                            authManager.signOut {}
+                            analytics.logAction("device_lock_blocked", "FAILED", duration, mapOf(
+                                "email" to userEmail,
+                                "reason" to verifyResult.reason
+                            ))
+                            analytics.flushSync()
+                            updateUserAuthUI()
+                            showAuthErrorDialog(verifyResult.title, verifyResult.reason)
+                            return@launch
+                        }
+                        is DeviceVerificationResult.Error -> {
+                            // Non-blocking warning (e.g. temporary offline)
+                            Log.w("MainActivity", "Device lock non-fatal verification note: ${verifyResult.errorMessage}")
+                        }
+                        is DeviceVerificationResult.Success -> {
+                            Log.d("MainActivity", "Device lock verified: ${verifyResult.message}")
+                        }
+                    }
+
                     if (user != null) {
                         analytics.linkUserToDevice(
                             user.uid,
@@ -210,6 +241,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     Toast.makeText(this@MainActivity, "Welcome, $name!", Toast.LENGTH_SHORT).show()
                     updateUserAuthUI()
                 } else {
+                    hideAuthLoading()
                     val err = res.exceptionOrNull()
                     val errMsg = err?.message ?: "Sign-in could not be completed"
                     analytics.logAction("google_signin_completed", "FAILED", duration, mapOf(
@@ -272,6 +304,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvUserAuthInitial = findViewById(R.id.tvUserAuthInitial)
 
         authManager = AuthManager(this)
+        deviceLockManager = DeviceLockManager(this)
         inAppNotificationManager = InAppNotificationManager(this)
         tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
