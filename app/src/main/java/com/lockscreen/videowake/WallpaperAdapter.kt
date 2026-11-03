@@ -49,6 +49,16 @@ class WallpaperAdapter(
     private var activeId: String = ""
     var isAdminMode: Boolean = false
 
+    private fun matchesId(item: WallpaperItem, targetId: String): Boolean {
+        if (targetId.isBlank()) return false
+        if (item.id == targetId) return true
+        val cleanTarget = targetId.removePrefix("cloud_")
+        val cleanItem = item.id.removePrefix("cloud_")
+        if (cleanItem == cleanTarget) return true
+        if (item.cloudId.isNotBlank() && item.cloudId == cleanTarget) return true
+        return false
+    }
+
     fun submitList(newItems: List<WallpaperItem>, currentActiveId: String) {
         items.clear()
         items.addAll(newItems)
@@ -59,8 +69,8 @@ class WallpaperAdapter(
     fun setActiveId(newActiveId: String) {
         val oldId = activeId
         activeId = newActiveId
-        val oldPos = items.indexOfFirst { it.id == oldId }
-        val newPos = items.indexOfFirst { it.id == newActiveId }
+        val oldPos = items.indexOfFirst { matchesId(it, oldId) }
+        val newPos = items.indexOfFirst { matchesId(it, newActiveId) }
         if (oldPos != -1) notifyItemChanged(oldPos)
         if (newPos != -1) notifyItemChanged(newPos)
     }
@@ -85,7 +95,7 @@ class WallpaperAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is WallpaperViewHolder) {
             val item = items[position]
-            val isActive = item.id == activeId
+            val isActive = matchesId(item, activeId)
             holder.bind(item, isActive)
         } else if (holder is AddViewHolder) {
             holder.bind()

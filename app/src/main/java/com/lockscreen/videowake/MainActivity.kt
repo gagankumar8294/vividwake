@@ -582,7 +582,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 applyCategoryFilter(currentStoreCategory)
 
                 if (isAdminMode) {
-                    tvStoreCatalogHeader.text = "👑 ADMIN CATALOG (${fullCatalogList.size} wallpapers, drafts visible)"
+                    tvStoreCatalogHeader.text = "ADMIN CATALOG (${fullCatalogList.size} wallpapers, drafts visible)"
                 } else {
                     tvStoreCatalogHeader.text = "Tap card to stream preview. Download to set as wallpaper."
                 }
@@ -684,6 +684,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     filePath = downloadedFile.absolutePath,
                     isDownloaded = true
                 )
+                fullCatalogList = fullCatalogList.map { if (it.id == updated.id) updated else it }
+                filteredCatalogList = filteredCatalogList.map { if (it.id == updated.id) updated else it }
                 storeAdapter.finishDownload(updated)
                 refreshGallery()
                 // Silent download - no toast alert as requested
@@ -715,6 +717,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 try {
                     repository.downloadManager.deleteLocalDownload(item.id)
                     val updated = item.copy(filePath = "", isDownloaded = false)
+                    fullCatalogList = fullCatalogList.map { if (it.id == updated.id) updated else it }
+                    filteredCatalogList = filteredCatalogList.map { if (it.id == updated.id) updated else it }
                     storeAdapter.updateItem(updated)
                     refreshGallery()
 
@@ -776,15 +780,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
 
         AlertDialog.Builder(this)
-            .setTitle("👑 Admin Secret Mode")
+            .setTitle("Admin Secret Mode")
             .setMessage("Enter Admin PIN to view unpublished/draft wallpapers:")
             .setView(input)
             .setPositiveButton("Unlock") { _, _ ->
                 val entered = input.text.toString().trim()
                 if (entered == CloudConfig.ADMIN_SECRET_PIN) {
                     isAdminMode = !isAdminMode
-                    val modeText = if (isAdminMode) "👑 Admin Mode ENABLED" else "Guest Mode Restored"
-                    tvAppTitle.text = if (isAdminMode) "👑 VividWake (Admin)" else "Lock Screen Video"
+                    val modeText = if (isAdminMode) "Admin Mode ENABLED" else "Guest Mode Restored"
+                    tvAppTitle.text = if (isAdminMode) "VividWake (Admin)" else "Lock Screen Video"
                     Toast.makeText(this, modeText, Toast.LENGTH_SHORT).show()
                     adapter.isAdminMode = isAdminMode
                     adapter.notifyDataSetChanged()

@@ -117,7 +117,13 @@ class WallpaperRepository(private val context: Context) {
     fun getActiveWallpaper(): WallpaperItem {
         val activeId = prefs.getString(VideoWallpaperService.KEY_ACTIVE_ID, ID_PRESET_TRIO) ?: ID_PRESET_TRIO
         val all = getAllWallpapers()
-        return all.find { it.id == activeId } ?: all.first()
+        val normalized = activeId.removePrefix("cloud_")
+        return all.find {
+            it.id == activeId ||
+            it.id == "cloud_$normalized" ||
+            (it.cloudId.isNotBlank() && it.cloudId == normalized) ||
+            it.id.removePrefix("cloud_") == normalized
+        } ?: all.first()
     }
 
     fun setActiveWallpaper(item: WallpaperItem) {

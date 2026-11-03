@@ -110,6 +110,8 @@ class VideoDownloadManager(private val context: Context) {
 
                 FileOutputStream(tempFile).use { output ->
                     var downloadedBytes = 0L
+                    var lastProgress = -1
+                    var lastProgressTime = 0L
                     val buffer = ByteArray(8 * 1024)
                     body.byteStream().use { input ->
                         var read: Int
@@ -118,7 +120,12 @@ class VideoDownloadManager(private val context: Context) {
                             downloadedBytes += read
                             if (totalBytes > 0) {
                                 val progress = ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 99)
-                                onProgress(progress)
+                                val now = System.currentTimeMillis()
+                                if (progress != lastProgress && (now - lastProgressTime >= 80 || progress == 99)) {
+                                    lastProgress = progress
+                                    lastProgressTime = now
+                                    onProgress(progress)
+                                }
                             }
                         }
                     }

@@ -361,7 +361,7 @@
             android:background="#261E38"
             android:paddingHorizontal="14dp"
             android:paddingVertical="6dp"
-            android:text="📱 Detected: Auto Detecting..."
+            android:text="Detected: Auto Detecting..."
             android:textColor="#D4AF37"
             android:textSize="12sp"
             android:textStyle="bold" />

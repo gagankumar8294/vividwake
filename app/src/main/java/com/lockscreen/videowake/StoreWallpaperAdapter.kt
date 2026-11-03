@@ -97,11 +97,22 @@ class StoreWallpaperAdapter(
     }
 
     fun setDownloadingProgress(itemId: String, progress: Int) {
+        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
+        if (idx != -1) {
+            val itemRow = rows[idx] as StoreRow.Item
+            if (itemRow.item.isDownloaded) {
+                downloadingProgressMap.remove(itemId)
+                return
+            }
+        }
+
         if (progress >= 100) {
             downloadingProgressMap.remove(itemId)
+            if (idx != -1) {
+                notifyItemChanged(idx, 100)
+            }
         } else {
             downloadingProgressMap[itemId] = progress
-            val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
             if (idx != -1) {
                 notifyItemChanged(idx, progress)
             }
