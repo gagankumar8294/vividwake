@@ -298,6 +298,112 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
+            <!-- Search & Browse Categories Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/layoutStoreSearchBar"
+                    android:layout_width="0dp"
+                    android:layout_height="42dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_search_glass"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="10dp">
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@android:drawable/ic_menu_search"
+                        app:tint="#D4AF37" />
+
+                    <EditText
+                        android:id="@+id/etStoreSearch"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:hint="Search wallpapers, games, heroes..."
+                        android:imeOptions="actionDone"
+                        android:singleLine="true"
+                        android:textColor="#FFFFFF"
+                        android:textColorHint="#7A708A"
+                        android:textSize="13sp" />
+
+                    <ImageButton
+                        android:id="@+id/btnClearStoreSearch"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        android:visibility="gone"
+                        app:tint="#D4AF37" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBrowseCategories"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="Browse"
+                    android:textAllCaps="false"
+                    android:textColor="#D4AF37"
+                    android:textSize="12sp"
+                    app:backgroundTint="#261E38"
+                    app:cornerRadius="10dp"
+                    app:strokeColor="#40D4AF37" />
+            </LinearLayout>
+
+            <!-- Active Sub-Filter & Breadcrumb Banner -->
+            <LinearLayout
+                android:id="@+id/layoutActiveFilterBanner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_search_glass"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvActiveFilterText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Showing: Gaming"
+                    android:textColor="#E8E2F2"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnResetActiveFilter"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="Clear"
+                    android:textAllCaps="false"
+                    android:textColor="#D4AF37"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <!-- Horizontal Category Filter Bar -->
             <HorizontalScrollView
                 android:id="@+id/hsvStoreCategories"
@@ -315,6 +421,68 @@
                     app:singleSelection="true"
                     app:selectionRequired="true" />
             </HorizontalScrollView>
+
+            <!-- Sub-Category / Franchise / Character Quick Discovery Bar -->
+            <HorizontalScrollView
+                android:id="@+id/hsvStoreSubTags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupStoreSubTags"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true"
+                    app:singleSelection="true"
+                    app:selectionRequired="false" />
+            </HorizontalScrollView>
+
+            <!-- Empty Search / Filter State Layout -->
+            <LinearLayout
+                android:id="@+id/layoutStoreEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="20dp"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvStoreEmptyTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="No wallpapers found"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStoreEmptySubtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:text="Try another character, franchise, or reset filters."
+                    android:textColor="#8E879E"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnResetStoreFilters"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="12dp"
+                    android:text="Reset Filters"
+                    android:textAllCaps="false"
+                    android:textColor="#D4AF37"
+                    android:textSize="12sp"
+                    app:cornerRadius="8dp"
+                    app:strokeColor="#D4AF37" />
+            </LinearLayout>
 
             <!-- Skeleton Loading Container -->
             <LinearLayout

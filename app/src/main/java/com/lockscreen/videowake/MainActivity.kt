@@ -19,14 +19,18 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -46,6 +50,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -91,13 +97,28 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var chipGroupStoreCategories: com.google.android.material.chip.ChipGroup
     private lateinit var pbStoreLoadMore: ProgressBar
 
+    // Enhanced Store Search, Sub-Categories & Quick Discovery
+    private lateinit var etStoreSearch: EditText
+    private lateinit var btnClearStoreSearch: ImageButton
+    private lateinit var btnBrowseCategories: MaterialButton
+    private lateinit var layoutActiveFilterBanner: LinearLayout
+    private lateinit var tvActiveFilterText: TextView
+    private lateinit var btnResetActiveFilter: MaterialButton
+    private lateinit var chipGroupStoreSubTags: com.google.android.material.chip.ChipGroup
+    private lateinit var layoutStoreEmptyState: LinearLayout
+    private lateinit var tvStoreEmptySubtitle: TextView
+    private lateinit var btnResetStoreFilters: MaterialButton
+
     // Explore Store Pagination & Filter State
     private var fullCatalogList: List<WallpaperItem> = emptyList()
     private var filteredCatalogList: List<WallpaperItem> = emptyList()
     private var currentStoreCategory: String = "All"
+    private var currentStoreSubTag: String = "All"
+    private var currentStoreSearchQuery: String = ""
     private var currentStorePage: Int = 0
     private val STORE_PAGE_SIZE: Int = 20
     private var isStoreLoadingMore: Boolean = false
+    private var searchJob: Job? = null
 
     // Action Buttons
     private lateinit var btnSetWallpaper: MaterialButton
@@ -327,6 +348,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         nestedScrollViewMain = findViewById(R.id.nestedScrollViewMain)
         chipGroupStoreCategories = findViewById(R.id.chipGroupStoreCategories)
         pbStoreLoadMore = findViewById(R.id.pbStoreLoadMore)
+
+        etStoreSearch = findViewById(R.id.etStoreSearch)
+        btnClearStoreSearch = findViewById(R.id.btnClearStoreSearch)
+        btnBrowseCategories = findViewById(R.id.btnBrowseCategories)
+        layoutActiveFilterBanner = findViewById(R.id.layoutActiveFilterBanner)
+        tvActiveFilterText = findViewById(R.id.tvActiveFilterText)
+        btnResetActiveFilter = findViewById(R.id.btnResetActiveFilter)
+        chipGroupStoreSubTags = findViewById(R.id.chipGroupStoreSubTags)
+        layoutStoreEmptyState = findViewById(R.id.layoutStoreEmptyState)
+        tvStoreEmptySubtitle = findViewById(R.id.tvStoreEmptySubtitle)
+        btnResetStoreFilters = findViewById(R.id.btnResetStoreFilters)
 
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
         btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
@@ -614,35 +646,239 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 text = "$cat ($count)"
                 isCheckable = true
                 isChecked = (cat == currentStoreCategory)
-                chipBackgroundColor = android.content.res.ColorStateList(
+                chipBackgroundColor = ColorStateList(
                     arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(android.graphics.Color.parseColor("#D4AF37"), android.graphics.Color.parseColor("#261E38"))
+                    intArrayOf(Color.parseColor("#D4AF37"), Color.parseColor("#261E38"))
                 )
-                setTextColor(android.content.res.ColorStateList(
+                setTextColor(ColorStateList(
                     arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(android.graphics.Color.parseColor("#0E0B16"), android.graphics.Color.parseColor("#B0A8C0"))
+                    intArrayOf(Color.parseColor("#0E0B16"), Color.parseColor("#B0A8C0"))
                 ))
                 chipStrokeWidth = 1f
-                chipStrokeColor = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#3A2F4C"))
+                chipStrokeColor = ColorStateList.valueOf(Color.parseColor("#3A2F4C"))
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked && currentStoreCategory != cat) {
+                        applyCategoryFilter(cat)
+                    }
+                }
                 setOnClickListener {
-                    applyCategoryFilter(cat)
+                    if (currentStoreCategory != cat) {
+                        applyCategoryFilter(cat)
+                    }
                 }
             }
             chipGroupStoreCategories.addView(chip)
         }
+        setupStoreSubTags()
+    }
+
+    private fun setupStoreSubTags() {
+        chipGroupStoreSubTags.removeAllViews()
+        val baseItems = if (currentStoreCategory == "All") {
+            fullCatalogList
+        } else {
+            fullCatalogList.filter { it.category.equals(currentStoreCategory, ignoreCase = true) }
+        }
+
+        val tagCounts = mutableMapOf<String, Int>()
+        val skipTags = setOf("wallpaper", "video", "animated", "lockscreen", "screen", "live", "4k", "hd", "loop")
+        baseItems.forEach { item ->
+            item.tags.forEach { t ->
+                val clean = t.trim().lowercase()
+                if (clean.length > 2 && clean !in skipTags) {
+                    tagCounts[clean] = (tagCounts[clean] ?: 0) + 1
+                }
+            }
+        }
+
+        val topTags = tagCounts.entries
+            .filter { it.value >= 1 }
+            .sortedByDescending { it.value }
+            .take(15)
+            .map { it.key }
+
+        val allLabel = if (currentStoreCategory == "All") "All Trending" else "All $currentStoreCategory"
+        val allChip = createSubTagChip("All", allLabel, isChecked = (currentStoreSubTag == "All" || currentStoreSubTag.isBlank()))
+        chipGroupStoreSubTags.addView(allChip)
+
+        for (tag in topTags) {
+            val count = tagCounts[tag] ?: 0
+            val formatted = formatTagName(tag)
+            val chip = createSubTagChip(tag, "$formatted ($count)", isChecked = (currentStoreSubTag.equals(tag, ignoreCase = true)))
+            chipGroupStoreSubTags.addView(chip)
+        }
+    }
+
+    private fun createSubTagChip(tagKey: String, displayLabel: String, isChecked: Boolean): com.google.android.material.chip.Chip {
+        return com.google.android.material.chip.Chip(this).apply {
+            text = displayLabel
+            isCheckable = true
+            this.isChecked = isChecked
+            chipBackgroundColor = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Color.parseColor("#FFD700"), Color.parseColor("#1B1428"))
+            )
+            setTextColor(ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Color.parseColor("#0E0B16"), Color.parseColor("#8E879E"))
+            ))
+            chipStrokeWidth = 1f
+            chipStrokeColor = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(Color.parseColor("#FFD700"), Color.parseColor("#33D4AF37"))
+            )
+            setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    applySubTagFilter(tagKey)
+                }
+            }
+            setOnClickListener {
+                applySubTagFilter(tagKey)
+            }
+        }
+    }
+
+    private fun formatTagName(tag: String): String {
+        return tag.split("-", "_", " ")
+            .filter { it.isNotBlank() }
+            .joinToString(" ") { word ->
+                when (word.lowercase()) {
+                    "pubg", "gta", "fps", "lol", "cod", "ai", "4k", "hd" -> word.uppercase()
+                    else -> word.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                }
+            }
     }
 
     private fun applyCategoryFilter(category: String) {
         currentStoreCategory = category
-        currentStorePage = 0
-        filteredCatalogList = if (category == "All") {
-            fullCatalogList
-        } else {
-            fullCatalogList.filter { it.category.equals(category, ignoreCase = true) }
+        currentStoreSubTag = "All"
+        setupStoreCategoryChips()
+        recomputeFilteredCatalog()
+    }
+
+    private fun applySubTagFilter(subTag: String) {
+        currentStoreSubTag = subTag
+        setupStoreSubTags()
+        recomputeFilteredCatalog()
+    }
+
+    private fun recomputeFilteredCatalog() {
+        var result = fullCatalogList
+
+        // 1. Category filter
+        if (currentStoreCategory != "All") {
+            result = result.filter { it.category.equals(currentStoreCategory, ignoreCase = true) }
         }
+
+        // 2. Sub-Tag filter
+        if (currentStoreSubTag.isNotBlank() && currentStoreSubTag != "All") {
+            val qTag = currentStoreSubTag.lowercase()
+            result = result.filter { item ->
+                item.tags.any { it.lowercase() == qTag || it.lowercase().contains(qTag) } ||
+                item.title.lowercase().contains(qTag) ||
+                item.description.lowercase().contains(qTag)
+            }
+        }
+
+        // 3. Search query filter
+        if (currentStoreSearchQuery.isNotBlank()) {
+            val tokens = currentStoreSearchQuery.lowercase().trim().split(" ").filter { it.isNotBlank() }
+            result = result.filter { item ->
+                tokens.all { t ->
+                    item.title.lowercase().contains(t) ||
+                    item.description.lowercase().contains(t) ||
+                    item.category.lowercase().contains(t) ||
+                    item.tags.any { it.lowercase().contains(t) }
+                }
+            }
+        }
+
+        filteredCatalogList = result
+        currentStorePage = 0
         val firstBatch = filteredCatalogList.take(STORE_PAGE_SIZE)
         storeAdapter.submitInitialList(firstBatch)
         currentStorePage = 1
+
+        // Empty state visibility
+        if (filteredCatalogList.isEmpty()) {
+            rvStoreWallpapers.visibility = View.GONE
+            layoutStoreEmptyState.visibility = View.VISIBLE
+            tvStoreEmptySubtitle.text = "No wallpapers found for '$currentStoreSearchQuery${if (currentStoreSubTag != "All") " / " + formatTagName(currentStoreSubTag) else ""}'."
+        } else {
+            rvStoreWallpapers.visibility = View.VISIBLE
+            layoutStoreEmptyState.visibility = View.GONE
+        }
+
+        updateActiveFilterBanner()
+    }
+
+    private fun updateActiveFilterBanner() {
+        val hasSubTag = currentStoreSubTag.isNotBlank() && currentStoreSubTag != "All"
+        val hasSearch = currentStoreSearchQuery.isNotBlank()
+
+        if (hasSubTag || hasSearch) {
+            layoutActiveFilterBanner.visibility = View.VISIBLE
+            val parts = mutableListOf<String>()
+            if (currentStoreCategory != "All") parts.add(currentStoreCategory)
+            if (hasSubTag) parts.add(formatTagName(currentStoreSubTag))
+            if (hasSearch) parts.add("\"$currentStoreSearchQuery\"")
+
+            tvActiveFilterText.text = "Showing: ${parts.joinToString(" > ")} (${filteredCatalogList.size} wallpapers)"
+        } else {
+            layoutActiveFilterBanner.visibility = View.GONE
+        }
+    }
+
+    private fun showCategoryBottomSheetDialog() {
+        val bottomSheet = BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_categories, null)
+        bottomSheet.setContentView(sheetView)
+
+        val btnClose = sheetView.findViewById<ImageButton>(R.id.btnCloseCategorySheet)
+        val rvCategories = sheetView.findViewById<RecyclerView>(R.id.rvCategorySheetGrid)
+
+        btnClose.setOnClickListener { bottomSheet.dismiss() }
+
+        val distinctCategories = fullCatalogList.map { it.category }.filter { it.isNotBlank() }.distinct()
+        val allCats = listOf("All") + distinctCategories
+
+        rvCategories.layoutManager = LinearLayoutManager(this)
+        rvCategories.adapter = object : RecyclerView.Adapter<CategorySheetViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CategorySheetViewHolder {
+                val v = layoutInflater.inflate(R.layout.item_category_sheet_card, parent, false)
+                return CategorySheetViewHolder(v)
+            }
+
+            override fun getItemCount(): Int = allCats.size
+
+            override fun onBindViewHolder(holder: CategorySheetViewHolder, position: Int) {
+                val cat = allCats[position]
+                val count = if (cat == "All") fullCatalogList.size else fullCatalogList.count { it.category.equals(cat, ignoreCase = true) }
+
+                // Get top 4 tags for this category
+                val catItems = if (cat == "All") fullCatalogList else fullCatalogList.filter { it.category.equals(cat, ignoreCase = true) }
+                val tagFreq = mutableMapOf<String, Int>()
+                val skipTags = setOf("wallpaper", "video", "animated", "lockscreen", "screen", "live", "4k", "hd", "loop")
+                catItems.take(150).forEach { item ->
+                    item.tags.forEach { t ->
+                        val clean = t.lowercase().trim()
+                        if (clean.length > 2 && clean !in skipTags) {
+                            tagFreq[clean] = (tagFreq[clean] ?: 0) + 1
+                        }
+                    }
+                }
+                val top4 = tagFreq.entries.sortedByDescending { it.value }.take(4).map { formatTagName(it.key) }
+                val tagSummary = if (top4.isNotEmpty()) top4.joinToString(" • ") else "Popular 4K lock screen wallpapers"
+
+                holder.bind(cat, count, tagSummary, cat.equals(currentStoreCategory, ignoreCase = true)) {
+                    applyCategoryFilter(cat)
+                    setupStoreCategoryChips()
+                    bottomSheet.dismiss()
+                }
+            }
+        }
+
+        bottomSheet.show()
     }
 
     private fun loadNextStorePage() {
@@ -1305,6 +1541,77 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 analytics.logAction("toggle_audio_mute", "FAILED", duration, mapOf("isMuted" to isChecked), e)
             }
         }
+
+        etStoreSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim() ?: ""
+                btnClearStoreSearch.visibility = if (q.isNotEmpty()) View.VISIBLE else View.GONE
+                searchJob?.cancel()
+                searchJob = lifecycleScope.launch {
+                    delay(200)
+                    currentStoreSearchQuery = q
+                    recomputeFilteredCatalog()
+                }
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        btnClearStoreSearch.setOnClickListener {
+            etStoreSearch.text.clear()
+            currentStoreSearchQuery = ""
+            recomputeFilteredCatalog()
+        }
+
+        btnBrowseCategories.setOnClickListener {
+            showCategoryBottomSheetDialog()
+        }
+
+        btnResetActiveFilter.setOnClickListener {
+            currentStoreSubTag = "All"
+            currentStoreSearchQuery = ""
+            etStoreSearch.text.clear()
+            setupStoreSubTags()
+            recomputeFilteredCatalog()
+        }
+
+        btnResetStoreFilters.setOnClickListener {
+            currentStoreCategory = "All"
+            currentStoreSubTag = "All"
+            currentStoreSearchQuery = ""
+            etStoreSearch.text.clear()
+            setupStoreCategoryChips()
+            recomputeFilteredCatalog()
+        }
+    }
+
+    inner class CategorySheetViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val card: com.google.android.material.card.MaterialCardView = itemView.findViewById(R.id.cardCategoryItem)
+        private val tvTitle: TextView = itemView.findViewById(R.id.tvSheetCategoryTitle)
+        private val tvCount: TextView = itemView.findViewById(R.id.tvSheetCategoryCount)
+        private val tvTags: TextView = itemView.findViewById(R.id.tvSheetCategoryTags)
+
+        fun bind(title: String, count: Int, tags: String, isSelected: Boolean, onClick: () -> Unit) {
+            tvTitle.text = title
+            tvCount.text = "$count"
+            tvTags.text = tags
+
+            if (isSelected) {
+                card.strokeColor = Color.parseColor("#D4AF37")
+                card.strokeWidth = dpToPx(2f)
+                card.setCardBackgroundColor(Color.parseColor("#2A1E3E"))
+            } else {
+                card.strokeColor = Color.parseColor("#382C4E")
+                card.strokeWidth = dpToPx(1f)
+                card.setCardBackgroundColor(Color.parseColor("#1F172E"))
+            }
+
+            card.setOnClickListener { onClick() }
+        }
+    }
+
+    private fun dpToPx(dp: Float): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 
     private fun getActiveVideoUri(item: WallpaperItem): Uri? {
