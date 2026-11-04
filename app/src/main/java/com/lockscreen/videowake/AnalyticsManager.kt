@@ -1,7 +1,11 @@
 package com.lockscreen.videowake
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.BatteryManager
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +17,8 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
+import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -219,6 +225,7 @@ class AnalyticsManager private constructor(private val context: Context) {
             }
 
             try {
+                val ram = getRamStats()
                 val payload = JSONObject().apply {
                     put("sessionId", sessionId)
                     put("deviceId", deviceId)
@@ -230,6 +237,19 @@ class AnalyticsManager private constructor(private val context: Context) {
                     put("deviceModel", Build.MODEL)
                     put("osVersion", "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
                     put("totalDurationMs", System.currentTimeMillis() - sessionStartTime)
+
+                    // Rich non-permission telemetry metrics
+                    put("appVersion", getAppVersionName())
+                    put("screenResolution", getScreenResolution())
+                    put("deviceHardware", Build.HARDWARE)
+                    put("deviceProduct", Build.PRODUCT)
+                    put("cpuAbi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
+                    put("locale", Locale.getDefault().toLanguageTag())
+                    put("timeZone", TimeZone.getDefault().id)
+                    put("batteryLevel", getBatteryLevel())
+                    if (ram.first > 0) put("ramTotalMB", ram.first)
+                    if (ram.second > 0) put("ramAvailMB", ram.second)
+                    put("networkType", getNetworkType())
 
                     val eventsArray = JSONArray()
                     for (ev in batch) {
@@ -257,6 +277,60 @@ class AnalyticsManager private constructor(private val context: Context) {
             } catch (e: Exception) {
                 Log.d(TAG, "Analytics sync deferred: ${e.message}")
             }
+        }
+    }
+
+    private fun getAppVersionName(): String {
+        return try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "1.0.0"
+        } catch (e: Exception) {
+            "1.0.0"
+        }
+    }
+
+    private fun getScreenResolution(): String {
+        return try {
+            val dm = context.resources.displayMetrics
+            "${dm.widthPixels}x${dm.heightPixels} (${dm.densityDpi}dpi)"
+        } catch (e: Exception) {
+            "Unknown"
+        }
+    }
+
+    private fun getBatteryLevel(): Int {
+        return try {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+            bm?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+        } catch (e: Exception) {
+            -1
+        }
+    }
+
+    private fun getRamStats(): Pair<Long, Long> {
+        return try {
+            val actMan = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            actMan?.getMemoryInfo(memInfo)
+            Pair(memInfo.totalMem / (1024 * 1024), memInfo.availMem / (1024 * 1024))
+        } catch (e: Exception) {
+            Pair(-1L, -1L)
+        }
+    }
+
+    private fun getNetworkType(): String {
+        return try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            val net = cm?.activeNetwork
+            val caps = cm?.getNetworkCapabilities(net)
+            when {
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "WiFi"
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "Cellular"
+                caps?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "Ethernet"
+                else -> "Active / Other"
+            }
+        } catch (e: Exception) {
+            "Unknown"
         }
     }
 }
