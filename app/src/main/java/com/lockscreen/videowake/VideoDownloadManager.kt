@@ -146,6 +146,9 @@ class VideoDownloadManager(private val context: Context) {
                 tempFile.delete()
             }
 
+            // 🛡️ Scramble first 1KB header so external file viewers / scrapers cannot play raw video
+            VaultSecurityManager.scrambleFile(destFile)
+
             markDownloaded(item.id)
             onProgress(100)
             Log.d(TAG, "Download complete: ${item.title} -> ${destFile.absolutePath} (${destFile.length()} bytes)")

@@ -489,21 +489,42 @@ class VideoWallpaperService : WallpaperService() {
                     setSurface(vSurface)
 
                     var dataSourceLoaded = false
-                    if (activeType == "file" && activeFilePath.isNotEmpty()) {
-                        val file = File(activeFilePath)
-                        if (file.exists() && file.length() > 0) {
-                            try {
-                                setDataSource(file.absolutePath)
-                                dataSourceLoaded = true
+                    val (isBanned, _) = VaultSecurityManager.isDeviceBanned(this@VideoWallpaperService)
 
-                                val retriever = MediaMetadataRetriever()
-                                try {
-                                    retriever.setDataSource(file.absolutePath)
-                                    videoRotation = retriever.extractMetadata(
-                                        MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
-                                    )?.toIntOrNull() ?: 0
-                                } catch (_: Exception) {} finally {
-                                    try { retriever.release() } catch (_: Exception) {}
+                    if (!isBanned && activeType == "file" && activeFilePath.isNotEmpty()) {
+                        val file = File(activeFilePath)
+                        val isCloudFile = file.name.startsWith("cloud_")
+                        val leaseValid = if (isCloudFile) VaultSecurityManager.isOfflineLeaseValid(this@VideoWallpaperService) else true
+
+                        if (leaseValid && file.exists() && file.length() > 0) {
+                            try {
+                                if (VaultSecurityManager.isScrambled(file)) {
+                                    val mds = VaultSecurityManager.createMediaDataSource(file)
+                                    setDataSource(mds)
+                                    dataSourceLoaded = true
+
+                                    val retriever = MediaMetadataRetriever()
+                                    try {
+                                        retriever.setDataSource(mds)
+                                        videoRotation = retriever.extractMetadata(
+                                            MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                                        )?.toIntOrNull() ?: 0
+                                    } catch (_: Exception) {} finally {
+                                        try { retriever.release() } catch (_: Exception) {}
+                                    }
+                                } else {
+                                    setDataSource(file.absolutePath)
+                                    dataSourceLoaded = true
+
+                                    val retriever = MediaMetadataRetriever()
+                                    try {
+                                        retriever.setDataSource(file.absolutePath)
+                                        videoRotation = retriever.extractMetadata(
+                                            MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                                        )?.toIntOrNull() ?: 0
+                                    } catch (_: Exception) {} finally {
+                                        try { retriever.release() } catch (_: Exception) {}
+                                    }
                                 }
                             } catch (e: Exception) {
                                 Log.e(TAG, "Failed to load custom video data source: $activeFilePath", e)

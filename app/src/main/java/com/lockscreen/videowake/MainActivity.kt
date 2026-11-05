@@ -140,6 +140,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var authManager: AuthManager
     private lateinit var deviceLockManager: DeviceLockManager
     private lateinit var inAppNotificationManager: InAppNotificationManager
+    private lateinit var previewCooldownManager: PreviewCooldownManager
 
     private var previewPlayer: MediaPlayer? = null
     private var previewSurface: Surface? = null
@@ -223,6 +224,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     hideAuthLoading()
 
                     when (verifyResult) {
+                        is DeviceVerificationResult.Banned -> {
+                            authManager.signOut {}
+                            analytics.logAction("device_banned_blocked", "FAILED", duration, mapOf(
+                                "reason" to verifyResult.reason
+                            ))
+                            analytics.flushSync()
+                            updateUserAuthUI()
+                            showBannedDeviceDialog(verifyResult.reason, userEmail)
+                            return@launch
+                        }
+                        is DeviceVerificationResult.MismatchedDevice -> {
+                            authManager.signOut {}
+                            analytics.logAction("device_mismatch_blocked", "FAILED", duration, mapOf(
+                                "boundDevice" to verifyResult.boundDevice,
+                                "transferStatus" to verifyResult.transferRequestStatus
+                            ))
+                            analytics.flushSync()
+                            updateUserAuthUI()
+                            showTransferRequestDialog(userEmail, verifyResult.boundDevice, verifyResult.transferRequestStatus)
+                            return@launch
+                        }
                         is DeviceVerificationResult.Blocked -> {
                             // Device or Email is bound to someone else!
                             // Immediately sign out to prevent unauthorized access
@@ -241,7 +263,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             Log.w("MainActivity", "Device lock non-fatal verification note: ${verifyResult.errorMessage}")
                         }
                         is DeviceVerificationResult.Success -> {
-                            Log.d("MainActivity", "Device lock verified: ${verifyResult.message}")
+                            Log.d("MainActivity", "Device lock verified: ${verifyResult.message} [Tier: ${verifyResult.tier}]")
                         }
                     }
 
@@ -327,6 +349,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         authManager = AuthManager(this)
         deviceLockManager = DeviceLockManager(this)
         inAppNotificationManager = InAppNotificationManager(this)
+        previewCooldownManager = PreviewCooldownManager(this)
         tvDeviceBrand = findViewById(R.id.tvDeviceBrand)
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
         tvActiveWallpaperSubtitle = findViewById(R.id.tvActiveWallpaperSubtitle)
@@ -1120,12 +1143,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnSwitch.setOnClickListener {
             dialog.dismiss()
             val start = System.currentTimeMillis()
+            VaultSecurityManager.performSelectiveLogoutPurge(this@MainActivity)
             authManager.signOut {
                 analytics.linkUserToDevice("", "")
                 analytics.logAction("switch_account_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
                 analytics.flushSync()
                 runOnUiThread {
                     updateUserAuthUI()
+                    refreshGallery()
                     try {
                         showAuthLoading("Opening Google Sign-In...")
                         googleSignInLauncher.launch(authManager.getSignInIntent())
@@ -1144,13 +1169,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setPositiveButton("Sign Out") { _, _ ->
                     dialog.dismiss()
                     val start = System.currentTimeMillis()
+                    VaultSecurityManager.performSelectiveLogoutPurge(this@MainActivity)
                     authManager.signOut {
                         analytics.linkUserToDevice("", "")
                         analytics.logAction("sign_out_clicked", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
                         analytics.flushSync()
                         runOnUiThread {
                             updateUserAuthUI()
-                            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                            refreshGallery()
+                            Toast.makeText(this, "Signed out. Active wallpaper preserved.", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
@@ -1815,15 +1842,29 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 } else {
                     val file = File(item.filePath)
                     if (file.exists() && file.length() > 0) {
-                        setDataSource(file.absolutePath)
-                        val retriever = MediaMetadataRetriever()
-                        try {
-                            retriever.setDataSource(file.absolutePath)
-                            rotation = retriever.extractMetadata(
-                                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
-                            )?.toIntOrNull() ?: 0
-                        } catch (_: Exception) {} finally {
-                            try { retriever.release() } catch (_: Exception) {}
+                        if (VaultSecurityManager.isScrambled(file)) {
+                            val mds = VaultSecurityManager.createMediaDataSource(file)
+                            setDataSource(mds)
+                            val retriever = MediaMetadataRetriever()
+                            try {
+                                retriever.setDataSource(mds)
+                                rotation = retriever.extractMetadata(
+                                    MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                                )?.toIntOrNull() ?: 0
+                            } catch (_: Exception) {} finally {
+                                try { retriever.release() } catch (_: Exception) {}
+                            }
+                        } else {
+                            setDataSource(file.absolutePath)
+                            val retriever = MediaMetadataRetriever()
+                            try {
+                                retriever.setDataSource(file.absolutePath)
+                                rotation = retriever.extractMetadata(
+                                    MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+                                )?.toIntOrNull() ?: 0
+                            } catch (_: Exception) {} finally {
+                                try { retriever.release() } catch (_: Exception) {}
+                            }
                         }
                     } else {
                         val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
@@ -1867,6 +1908,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun playStreamingVideoInPreview(item: WallpaperItem) {
         val surface = previewSurface ?: return
         if (item.videoUrl.isBlank()) return
+
+        val isVip = VaultSecurityManager.getUserTier(this) == "VIP"
+        if (!isVip && !previewCooldownManager.consumePreview()) {
+            val status = previewCooldownManager.getStatus()
+            val minutesLeft = (status.cooldownRemainingMs / 60000L) + 1
+            showPreviewCooldownDialog(minutesLeft)
+            return
+        }
 
         val start = System.currentTimeMillis()
         try {
@@ -1921,6 +1970,76 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             ), e)
             analytics.flushSync()
         }
+    }
+
+    private fun showPreviewCooldownDialog(minutesLeft: Long) {
+        AlertDialog.Builder(this)
+            .setTitle("Preview Cooldown Active ⏳")
+            .setMessage("You have used your preview credits for this session.\n\n5 fresh previews will unlock automatically in ~$minutesLeft minutes. You'll receive a notification as soon as they're ready!")
+            .setPositiveButton("Got It", null)
+            .show()
+    }
+
+    private fun showBannedDeviceDialog(reason: String, userEmail: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Access Restricted")
+            .setMessage("This device has been restricted by the administrator.\n\nReason: $reason\n\nIf you believe this is an error, you can submit an appeal by sending an email from your registered Google account.")
+            .setCancelable(false)
+            .setPositiveButton("Contact Support") { _, _ ->
+                val intent = Intent(Intent.ACTION_SENDTO).apply {
+                    data = Uri.parse("mailto:vividwake.support@gmail.com")
+                    putExtra(Intent.EXTRA_SUBJECT, "VividWake Account Appeal")
+                    putExtra(Intent.EXTRA_TEXT, "Hello Support Team,\n\nI am requesting a review of the restriction on my account.\n\nLinked Email: $userEmail\n\nThank you.")
+                }
+                try {
+                    startActivity(intent)
+                } catch (_: Exception) {
+                    Toast.makeText(this, "Please email vividwake.support@gmail.com from your registered address", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showTransferRequestDialog(userEmail: String, boundDevice: String, transferStatus: String) {
+        if (transferStatus == "PENDING") {
+            AlertDialog.Builder(this)
+                .setTitle("Transfer Request Pending ⏳")
+                .setMessage("A device transfer request for $userEmail is already submitted and awaiting administrator approval.\n\nOnce approved, you will be able to sign in on this phone.")
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Contact Support") { _, _ ->
+                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                        data = Uri.parse("mailto:vividwake.support@gmail.com")
+                        putExtra(Intent.EXTRA_SUBJECT, "VividWake Transfer Status")
+                        putExtra(Intent.EXTRA_TEXT, "Hello Support Team,\n\nI submitted a device transfer request for my account ($userEmail). Please review when possible.\n\nThank you.")
+                    }
+                    try { startActivity(intent) } catch (_: Exception) {}
+                }
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Device Transfer Required 🔒")
+            .setMessage("Your Google account is currently registered on another device ($boundDevice).\n\nUnder our 1-to-1 device security policy, your account can only be active on one phone at a time.\n\nWould you like to request an authorized transfer to this phone?")
+            .setPositiveButton("Request Transfer") { _, _ ->
+                lifecycleScope.launch {
+                    showAuthLoading("Submitting transfer request...")
+                    val result = deviceLockManager.requestRebind(userEmail, "User switched to new phone")
+                    hideAuthLoading()
+                    if (result.isSuccess) {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Request Submitted")
+                            .setMessage("Your transfer request has been submitted to the administrator. You will be able to log in once approved.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "Failed: ${result.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun stopPreviewPlayback() {
