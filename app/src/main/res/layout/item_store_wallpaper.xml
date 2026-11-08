@@ -62,13 +62,12 @@
                         android:alpha="0.5" />
                 </FrameLayout>
 
-                <!-- Featured Badge: Slim height, full width -->
+                <!-- Featured Badge: Centered on thumbnail image -->
                 <TextView
                     android:id="@+id/tvStoreFeaturedBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="16dp"
-                    android:layout_gravity="top|start"
-                    android:layout_margin="4dp"
+                    android:layout_gravity="center"
                     android:background="@drawable/bg_featured_badge_mini"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="0dp"
@@ -129,10 +128,38 @@
                 android:textColor="#B0A8C0"
                 android:textSize="12sp" />
 
+            <!-- Spacer: Pushes Size + Gift icon and Action Button tightly to the bottom -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <!-- Download Progress Bar -->
+            <ProgressBar
+                android:id="@+id/pbStoreDownload"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:max="100"
+                android:progressTint="#D4AF37"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvStoreProgressText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="Downloading 0%..."
+                android:textColor="#D4AF37"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <!-- File Size & Gift Icon Row: Positioned directly above the action button with no gap -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
+                android:layout_marginBottom="6dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -160,38 +187,10 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Download Progress Bar -->
-            <ProgressBar
-                android:id="@+id/pbStoreDownload"
-                style="@android:style/Widget.ProgressBar.Horizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:max="100"
-                android:progressTint="#D4AF37"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/tvStoreProgressText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Downloading 0%..."
-                android:textColor="#D4AF37"
-                android:textSize="11sp"
-                android:visibility="gone" />
-
-            <!-- Spacer -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
-            <!-- Action Buttons -->
+            <!-- Action Buttons: Positioned flush at bottom -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
