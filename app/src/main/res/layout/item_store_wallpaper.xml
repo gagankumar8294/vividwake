@@ -62,17 +62,24 @@
                         android:alpha="0.5" />
                 </FrameLayout>
 
-                <!-- Featured Star Badge (Top-Left): Sleek 22dp glass circular icon badge -->
-                <ImageView
+                <!-- Featured Badge: Restored to previous rectangular tag -->
+                <TextView
                     android:id="@+id/tvStoreFeaturedBadge"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:layout_gravity="top|start"
-                    android:layout_margin="6dp"
-                    android:background="@drawable/bg_circle_featured_badge"
-                    android:padding="4dp"
-                    android:src="@drawable/ic_star"
-                    app:tint="#D4AF37"
+                    android:layout_margin="4dp"
+                    android:background="#D4AF37"
+                    android:paddingHorizontal="6dp"
+                    android:paddingVertical="2dp"
+                    android:gravity="center_vertical"
+                    android:drawableStart="@drawable/ic_sparkle"
+                    android:drawablePadding="2dp"
+                    android:drawableTint="#0E0B16"
+                    android:text="FEATURED"
+                    android:textColor="#0E0B16"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
                     android:visibility="gone" />
 
                 <!-- Downloaded Check Badge (Top-Right): 20dp green circle with check icon -->
@@ -81,24 +88,11 @@
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:layout_gravity="top|end"
-                    android:layout_margin="6dp"
+                    android:layout_margin="4dp"
                     android:background="#22C55E"
                     android:padding="3dp"
                     android:src="@drawable/ic_check"
                     app:tint="#FFFFFF"
-                    android:visibility="gone" />
-
-                <!-- Gifted Floating Icon Badge (Bottom-Start): Elegant 24dp glass circle with gold gift icon -->
-                <ImageView
-                    android:id="@+id/tvStoreGiftedBadge"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_gravity="bottom|start"
-                    android:layout_margin="6dp"
-                    android:background="@drawable/bg_circle_gift_badge"
-                    android:padding="4dp"
-                    android:src="@drawable/ic_gift"
-                    app:tint="#FFD700"
                     android:visibility="gone" />
 
             </FrameLayout>
@@ -153,23 +147,15 @@
                     android:textSize="10sp"
                     android:textStyle="bold" />
 
-                <!-- Gifted Tag Pill in Details Column -->
-                <TextView
-                    android:id="@+id/tvStoreGiftedTextBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <!-- Gifted Icon next to size: pure clean icon, no border, no text -->
+                <ImageView
+                    android:id="@+id/ivStoreGiftedIcon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_gifted_badge"
-                    android:paddingHorizontal="6dp"
-                    android:paddingVertical="2dp"
-                    android:gravity="center_vertical"
-                    android:drawableStart="@drawable/ic_gift"
-                    android:drawablePadding="4dp"
-                    android:drawableTint="#FFD700"
-                    android:text="Gifted"
-                    android:textColor="#FFD700"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
+                    android:contentDescription="Gifted Wallpaper"
+                    android:src="@drawable/ic_gift"
+                    app:tint="#D4AF37"
                     android:visibility="gone" />
             </LinearLayout>
 
