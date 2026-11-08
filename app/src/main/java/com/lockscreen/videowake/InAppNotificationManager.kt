@@ -108,6 +108,24 @@ class InAppNotificationManager(private val context: Context) {
         saveNotifications(list)
     }
 
+    fun markAsRead(notificationId: String): Boolean {
+        val list = getNotifications()
+        var updated = false
+        for (item in list) {
+            if (item.id == notificationId) {
+                if (!item.isRead) {
+                    item.isRead = true
+                    updated = true
+                }
+                break
+            }
+        }
+        if (updated) {
+            saveNotifications(list)
+        }
+        return updated
+    }
+
     fun clearAll() {
         prefs.edit().remove(KEY_NOTIFICATIONS).apply()
     }

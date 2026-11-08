@@ -258,20 +258,32 @@ class AnalyticsManager private constructor(private val context: Context) {
                     put("events", eventsArray)
                 }
 
-                val syncUrl = "${CloudConfig.ANALYTICS_BASE_URL}/api/analytics/sync"
-                val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
-                val request = Request.Builder()
-                    .url(syncUrl)
-                    .header("User-Agent", "VideoLockScreen-Telemetry")
-                    .header("x-app-auth", "vividwake_secure_app_key_2026")
-                    .post(body)
-                    .build()
+                val syncUrls = listOf(
+                    "${CloudConfig.ANALYTICS_BASE_URL}/api/analytics/sync",
+                    "http://127.0.0.1:5000/api/analytics/sync"
+                )
+                var synced = false
+                for (syncUrl in syncUrls) {
+                    try {
+                        val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+                        val request = Request.Builder()
+                            .url(syncUrl)
+                            .header("User-Agent", "VideoLockScreen-Telemetry")
+                            .header("x-app-auth", "vividwake_secure_app_key_2026")
+                            .post(body)
+                            .build()
 
-                httpClient.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        Log.d(TAG, "Synced ${batch.size} APM events to backend")
-                    } else {
-                        Log.d(TAG, "Backend sync HTTP ${response.code}")
+                        httpClient.newCall(request).execute().use { response ->
+                            if (response.isSuccessful) {
+                                Log.d(TAG, "Synced ${batch.size} APM events to backend ($syncUrl)")
+                                synced = true
+                            } else {
+                                Log.d(TAG, "Backend sync HTTP ${response.code} from $syncUrl")
+                            }
+                        }
+                        if (synced) break
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Sync attempt to $syncUrl deferred: ${e.message}")
                     }
                 }
             } catch (e: Exception) {

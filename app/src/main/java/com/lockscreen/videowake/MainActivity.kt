@@ -1360,7 +1360,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun showInAppNotificationsDialog() {
         val bellStart = System.currentTimeMillis()
         val count = inAppNotificationManager.getUnreadCount()
-        analytics.logAction("notification_bell_clicked", "SUCCESS", System.currentTimeMillis() - bellStart, mapOf("unreadCount" to count))
+        val totalCount = inAppNotificationManager.getNotifications().size
+        analytics.logAction("notification_modal_opened", "SUCCESS", System.currentTimeMillis() - bellStart, mapOf(
+            "unreadCount" to count,
+            "totalCount" to totalCount,
+            "action" to "opened"
+        ))
+        analytics.flushSync()
 
         val dialog = BottomSheetDialog(this, R.style.Theme_VideoLockScreen_BottomSheetDialog)
         val view = layoutInflater.inflate(R.layout.dialog_inapp_notifications, null)
@@ -1369,6 +1375,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val rv = view.findViewById<RecyclerView>(R.id.rvInAppNotifs)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyNotifs)
         val btnClear = view.findViewById<TextView>(R.id.btnClearAllNotifs)
+        val btnMarkAll = view.findViewById<TextView>(R.id.btnMarkAllRead)
 
         fun renderList() {
             val list = inAppNotificationManager.getNotifications()
@@ -1381,11 +1388,22 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 rv.layoutManager = LinearLayoutManager(this)
                 val notifAdapter = InAppNotificationAdapter(list) { notif ->
                     val clickStart = System.currentTimeMillis()
+                    // 1. Mark this specific notification as read in persistent storage
+                    inAppNotificationManager.markAsRead(notif.id)
+                    notif.isRead = true
+
+                    // 2. Immediately update unread badge on top bar
+                    updateNotificationBadge()
+
+                    // 3. Log real-time analytics event for Admin Dashboard
                     analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
                         "notifId" to notif.id,
                         "title" to notif.title,
-                        "wallpaperId" to (notif.wallpaperId ?: "")
+                        "wallpaperId" to (notif.wallpaperId ?: ""),
+                        "target" to notif.title
                     ))
+                    analytics.flushSync()
+
                     dialog.dismiss()
                     if (!notif.wallpaperId.isNullOrBlank()) {
                         switchToStoreTab()
@@ -1415,16 +1433,24 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             } catch (_: Exception) {}
         }
 
+        btnMarkAll?.setOnClickListener {
+            inAppNotificationManager.markAllAsRead()
+            updateNotificationBadge()
+            renderList()
+            analytics.logAction("notification_mark_all_read", "SUCCESS", 0)
+            analytics.flushSync()
+        }
+
         btnClear.setOnClickListener {
             val clearStart = System.currentTimeMillis()
             val cleared = inAppNotificationManager.getNotifications().size
             inAppNotificationManager.clearAll()
             analytics.logAction("notification_clear_all_clicked", "SUCCESS", System.currentTimeMillis() - clearStart, mapOf("clearedCount" to cleared))
+            analytics.flushSync()
             updateNotificationBadge()
             dialog.dismiss()
         }
 
-        inAppNotificationManager.markAllAsRead()
         updateNotificationBadge()
         dialog.show()
     }
