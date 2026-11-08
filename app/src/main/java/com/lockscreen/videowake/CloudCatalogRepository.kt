@@ -79,9 +79,11 @@ class CloudCatalogRepository(
                 httpClient.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         val body = response.body?.string()
-                        if (!body.isNullOrBlank()) {
+                        if (!body.isNullOrBlank() && body.trim() != "[]" && body.trim() != "{}") {
                             Log.d(TAG, "Fetched live wallpapers.json from $baseUrl (${body.length} chars)")
                             return body
+                        } else {
+                            Log.d(TAG, "Response from $baseUrl was empty array/object, trying fallback...")
                         }
                     }
                 }
