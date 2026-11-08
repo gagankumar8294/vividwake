@@ -357,15 +357,16 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- Concept 1: Unified Command Bar (Single 44dp row) -->
+            <!-- Concept 1: Unified Command Bar (Single 44dp row with smooth expansion) -->
             <LinearLayout
                 android:id="@+id/layoutStoreCommandBar"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
+                android:animateLayoutChanges="true"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <!-- Search Input Container (Flexible width) -->
+                <!-- Search Input Container (Flexible width, expands when focused) -->
                 <LinearLayout
                     android:id="@+id/layoutStoreSearchBar"
                     android:layout_width="0dp"
@@ -380,7 +381,7 @@
                     <ImageView
                         android:layout_width="18dp"
                         android:layout_height="18dp"
-                        android:src="@android:drawable/ic_menu_search"
+                        android:src="@drawable/ic_search"
                         app:tint="#D4AF37" />
 
                     <EditText
@@ -402,12 +403,12 @@
                         android:layout_width="28dp"
                         android:layout_height="28dp"
                         android:background="?selectableItemBackgroundBorderless"
-                        android:src="@android:drawable/ic_menu_close_clear_cancel"
+                        android:src="@drawable/ic_close"
                         android:visibility="gone"
                         app:tint="#D4AF37" />
                 </LinearLayout>
 
-                <!-- 🎁 Gifted Filter Toggle Button -->
+                <!-- Gifted Filter Toggle Button (Collapses to icon-only when search is active) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnFilterGifted"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -418,17 +419,22 @@
                     android:insetBottom="0dp"
                     android:paddingStart="12dp"
                     android:paddingEnd="12dp"
-                    android:text="🎁 Gifted"
+                    android:text="Gifted"
                     android:textAllCaps="false"
                     android:textColor="#D4AF37"
                     android:textSize="12sp"
                     android:textStyle="bold"
+                    app:icon="@drawable/ic_gift"
+                    app:iconGravity="textStart"
+                    app:iconPadding="6dp"
+                    app:iconSize="16dp"
+                    app:iconTint="#D4AF37"
                     app:backgroundTint="#261E38"
                     app:cornerRadius="10dp"
                     app:strokeColor="#50D4AF37"
                     app:strokeWidth="1.2dp" />
 
-                <!-- ⚙ Category Filter Modal Button -->
+                <!-- Category Filter Modal Button -->
                 <FrameLayout
                     android:id="@+id/btnStoreFilterCategories"
                     android:layout_width="44dp"
@@ -442,12 +448,12 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:layout_gravity="center"
-                        android:src="@drawable/ic_folder"
+                        android:src="@drawable/ic_filter"
                         app:tint="#D4AF37" />
                 </FrameLayout>
             </LinearLayout>
 
-            <!-- Active Category Breadcrumb Banner (Shown only if a specific filter is active) -->
+            <!-- Active Category Breadcrumb Banner (Clean status banner without emojis) -->
             <LinearLayout
                 android:id="@+id/layoutActiveFilterBanner"
                 android:layout_width="match_parent"
@@ -457,17 +463,25 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
-                android:paddingTop="4dp"
+                android:paddingTop="5dp"
                 android:paddingEnd="8dp"
-                android:paddingBottom="4dp"
+                android:paddingBottom="5dp"
                 android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/ivActiveFilterIcon"
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:layout_marginEnd="8dp"
+                    android:src="@drawable/ic_gift"
+                    app:tint="#D4AF37" />
 
                 <TextView
                     android:id="@+id/tvActiveFilterText"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Showing: All"
+                    android:text="Gifted Wallpapers"
                     android:textColor="#E8E2F2"
                     android:textSize="11.5sp" />
 
@@ -475,16 +489,21 @@
                     android:id="@+id/btnResetActiveFilter"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="30dp"
+                    android:layout_height="28dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:minWidth="0dp"
                     android:paddingStart="6dp"
                     android:paddingEnd="6dp"
-                    android:text="✕ Clear"
+                    android:text="Clear"
                     android:textAllCaps="false"
                     android:textColor="#D4AF37"
-                    android:textSize="11sp" />
+                    android:textSize="11sp"
+                    app:icon="@drawable/ic_close"
+                    app:iconGravity="textStart"
+                    app:iconPadding="3dp"
+                    app:iconSize="12dp"
+                    app:iconTint="#D4AF37" />
             </LinearLayout>
 
             <!-- Empty Search / Filter State Layout -->

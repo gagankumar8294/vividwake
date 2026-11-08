@@ -12,6 +12,7 @@ import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Rect
 import android.graphics.SurfaceTexture
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -24,10 +25,12 @@ import android.text.TextWatcher
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -95,12 +98,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var nestedScrollViewMain: androidx.core.widget.NestedScrollView
     private lateinit var pbStoreLoadMore: ProgressBar
 
-    // Concept 1: Command Bar, Search & 🎁 Gifted Filter
+    // Concept 1: Command Bar, Search & Gifted Filter
+    private lateinit var layoutStoreSearchBar: LinearLayout
     private lateinit var etStoreSearch: EditText
     private lateinit var btnClearStoreSearch: ImageButton
     private lateinit var btnFilterGifted: MaterialButton
     private lateinit var btnStoreFilterCategories: View
     private lateinit var layoutActiveFilterBanner: LinearLayout
+    private lateinit var ivActiveFilterIcon: ImageView
     private lateinit var tvActiveFilterText: TextView
     private lateinit var btnResetActiveFilter: MaterialButton
     private lateinit var layoutStoreEmptyState: LinearLayout
@@ -109,6 +114,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var btnResetStoreFilters: MaterialButton
 
     private var isGiftedFilterActive: Boolean = false
+    private var isSearchExpanded: Boolean = false
 
     // Explore Store Pagination & Filter State
     private var fullCatalogList: List<WallpaperItem> = emptyList()
@@ -408,11 +414,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         nestedScrollViewMain = findViewById(R.id.nestedScrollViewMain)
         pbStoreLoadMore = findViewById(R.id.pbStoreLoadMore)
 
+        layoutStoreSearchBar = findViewById(R.id.layoutStoreSearchBar)
         etStoreSearch = findViewById(R.id.etStoreSearch)
         btnClearStoreSearch = findViewById(R.id.btnClearStoreSearch)
         btnFilterGifted = findViewById(R.id.btnFilterGifted)
         btnStoreFilterCategories = findViewById(R.id.btnStoreFilterCategories)
         layoutActiveFilterBanner = findViewById(R.id.layoutActiveFilterBanner)
+        ivActiveFilterIcon = findViewById(R.id.ivActiveFilterIcon)
         tvActiveFilterText = findViewById(R.id.tvActiveFilterText)
         btnResetActiveFilter = findViewById(R.id.btnResetActiveFilter)
         layoutStoreEmptyState = findViewById(R.id.layoutStoreEmptyState)
@@ -794,34 +802,79 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun updateGiftedFilterButtonUI() {
         val giftedCount = fullCatalogList.count { it.isGifted }
-        val label = if (giftedCount > 0) "🎁 Gifted ($giftedCount)" else "🎁 Gifted"
-        btnFilterGifted.text = label
+        val label = if (giftedCount > 0) "Gifted ($giftedCount)" else "Gifted"
+        btnFilterGifted.text = if (isSearchExpanded) "" else label
 
         if (isGiftedFilterActive) {
             btnFilterGifted.setBackgroundColor(Color.parseColor("#D4AF37"))
             btnFilterGifted.setTextColor(Color.parseColor("#120E1F"))
             btnFilterGifted.strokeColor = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
+            btnFilterGifted.iconTint = ColorStateList.valueOf(Color.parseColor("#120E1F"))
         } else {
             btnFilterGifted.setBackgroundColor(Color.parseColor("#261E38"))
             btnFilterGifted.setTextColor(Color.parseColor("#D4AF37"))
             btnFilterGifted.strokeColor = ColorStateList.valueOf(Color.parseColor("#50D4AF37"))
+            btnFilterGifted.iconTint = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
         }
     }
 
+    private fun updateCommandBarState(expanded: Boolean) {
+        isSearchExpanded = expanded
+        val density = resources.displayMetrics.density
+        if (expanded) {
+            btnFilterGifted.text = ""
+            btnFilterGifted.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            btnFilterGifted.iconPadding = 0
+            val params = btnFilterGifted.layoutParams
+            params.width = (44 * density).toInt()
+            btnFilterGifted.layoutParams = params
+            btnFilterGifted.setPadding(0, 0, 0, 0)
+        } else {
+            val params = btnFilterGifted.layoutParams
+            params.width = ViewGroup.LayoutParams.WRAP_CONTENT
+            btnFilterGifted.layoutParams = params
+            val padHoriz = (12 * density).toInt()
+            btnFilterGifted.setPadding(padHoriz, 0, padHoriz, 0)
+            btnFilterGifted.iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+            btnFilterGifted.iconPadding = (6 * density).toInt()
+        }
+        updateGiftedFilterButtonUI()
+    }
+
     private fun updateActiveFilterBanner() {
+        val hasGifted = isGiftedFilterActive
         val hasCategory = currentStoreCategory != "All"
         val hasSubTag = currentStoreSubTag.isNotBlank() && currentStoreSubTag != "All"
         val hasSearch = currentStoreSearchQuery.isNotBlank()
 
-        if (isGiftedFilterActive || hasCategory || hasSubTag || hasSearch) {
+        if (hasGifted || hasCategory || hasSubTag || hasSearch) {
             layoutActiveFilterBanner.visibility = View.VISIBLE
-            val parts = mutableListOf<String>()
-            if (isGiftedFilterActive) parts.add("🎁 Gifted Only")
-            if (hasCategory) parts.add(currentStoreCategory)
-            if (hasSubTag) parts.add(formatTagName(currentStoreSubTag))
-            if (hasSearch) parts.add("\"$currentStoreSearchQuery\"")
+            val count = filteredCatalogList.size
+            val itemText = if (count == 1) "1 wallpaper" else "$count wallpapers"
 
-            tvActiveFilterText.text = "Showing: ${parts.joinToString(" • ")} (${filteredCatalogList.size} wallpapers)"
+            when {
+                hasGifted && hasCategory -> {
+                    ivActiveFilterIcon.setImageResource(R.drawable.ic_gift)
+                    tvActiveFilterText.text = "Gifted • $currentStoreCategory ($itemText)"
+                }
+                hasGifted -> {
+                    ivActiveFilterIcon.setImageResource(R.drawable.ic_gift)
+                    tvActiveFilterText.text = "Gifted Wallpapers ($itemText)"
+                }
+                hasSearch -> {
+                    ivActiveFilterIcon.setImageResource(R.drawable.ic_search)
+                    tvActiveFilterText.text = "Search: \"$currentStoreSearchQuery\" ($itemText)"
+                }
+                hasCategory -> {
+                    ivActiveFilterIcon.setImageResource(R.drawable.ic_filter)
+                    val title = if (hasSubTag) "$currentStoreCategory • ${formatTagName(currentStoreSubTag)}" else currentStoreCategory
+                    tvActiveFilterText.text = "$title ($itemText)"
+                }
+                else -> {
+                    ivActiveFilterIcon.setImageResource(R.drawable.ic_filter)
+                    tvActiveFilterText.text = "Filtered ($itemText)"
+                }
+            }
         } else {
             layoutActiveFilterBanner.visibility = View.GONE
         }
@@ -1512,6 +1565,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
         }
 
+        etStoreSearch.setOnFocusChangeListener { _, hasFocus ->
+            updateCommandBarState(hasFocus)
+            val q = etStoreSearch.text?.toString()?.trim() ?: ""
+            btnClearStoreSearch.visibility = if (hasFocus && q.isNotEmpty()) View.VISIBLE else View.GONE
+        }
+
         etStoreSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -1530,6 +1589,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnClearStoreSearch.setOnClickListener {
             etStoreSearch.text.clear()
             currentStoreSearchQuery = ""
+            btnClearStoreSearch.visibility = View.GONE
+            etStoreSearch.clearFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(etStoreSearch.windowToken, 0)
+            updateCommandBarState(false)
             recomputeFilteredCatalog()
         }
 
@@ -1562,6 +1626,23 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             updateGiftedFilterButtonUI()
             recomputeFilteredCatalog()
         }
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        if (ev.action == MotionEvent.ACTION_DOWN) {
+            val v = currentFocus
+            if (v is EditText && v.id == R.id.etStoreSearch) {
+                val outRect = Rect()
+                layoutStoreSearchBar.getGlobalVisibleRect(outRect)
+                if (!outRect.contains(ev.rawX.toInt(), ev.rawY.toInt())) {
+                    v.clearFocus()
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    imm?.hideSoftInputFromWindow(v.windowToken, 0)
+                    updateCommandBarState(false)
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
     }
 
     inner class CategorySheetViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
