@@ -28,6 +28,11 @@ sealed class DeviceVerificationResult {
         val errorMessage: String
     ) : DeviceVerificationResult()
 
+    data class DeviceLockedToAnotherEmail(
+        val boundEmail: String,
+        val errorMessage: String
+    ) : DeviceVerificationResult()
+
     data class Blocked(val reason: String, val title: String) : DeviceVerificationResult()
     data class Error(val errorMessage: String) : DeviceVerificationResult()
 }
@@ -111,6 +116,13 @@ class DeviceLockManager(private val context: Context) {
                     val boundDevice = json.optString("boundDevice", "Another Android Phone")
                     val transferStatus = json.optString("transferRequestStatus", "NONE")
                     return@withContext DeviceVerificationResult.MismatchedDevice(boundDevice, transferStatus, errorMsg)
+                }
+
+                if (status == "PHONE_LOCKED_TO_ANOTHER_EMAIL" || json.has("lockedEmail") || json.has("boundEmail")) {
+                    val boundEmail = json.optString("boundEmail", json.optString("lockedEmail", json.optString("lockedEmailMasked", "")))
+                    if (boundEmail.isNotBlank()) {
+                        return@withContext DeviceVerificationResult.DeviceLockedToAnotherEmail(boundEmail, errorMsg)
+                    }
                 }
 
                 val title = "Device Access Restricted"

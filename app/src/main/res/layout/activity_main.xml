@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- Title Section (Tap 5 times for Admin mode) -->
+        <!-- Title Section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -26,7 +26,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:fontFamily="serif"
-                android:text="Lock Screen Video"
+                android:text="VividWake"
                 android:textColor="#D4AF37"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -146,6 +146,93 @@
                     android:id="@+id/previewTextureView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent" />
+
+                <!-- Mock Lock Screen Clock & Notification Note Overlay -->
+                <LinearLayout
+                    android:id="@+id/layoutLockScreenMock"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:clickable="false">
+
+                    <!-- Digital Clock -->
+                    <TextClock
+                        android:id="@+id/tcMockClock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:format12Hour="h:mm"
+                        android:format24Hour="HH:mm"
+                        android:textColor="#FFFFFF"
+                        android:textSize="44sp"
+                        android:textStyle="bold"
+                        android:shadowColor="#80000000"
+                        android:shadowDx="0"
+                        android:shadowDy="2"
+                        android:shadowRadius="8"
+                        android:fontFamily="sans-serif-light" />
+
+                    <!-- Date & Clock Icon Row -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="-4dp">
+
+                        <ImageView
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
+                            android:src="@drawable/ic_clock"
+                            android:layout_marginEnd="6dp"
+                            app:tint="#D4AF37" />
+
+                        <TextClock
+                            android:id="@+id/tcMockDate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:format12Hour="EEE, MMM d"
+                            android:format24Hour="EEE, d MMM"
+                            android:textColor="#E0E0E0"
+                            android:textSize="12sp"
+                            android:shadowColor="#80000000"
+                            android:shadowDx="0"
+                            android:shadowDy="1"
+                            android:shadowRadius="4" />
+                    </LinearLayout>
+
+                    <!-- Slight Lock Screen Notification Note -->
+                    <LinearLayout
+                        android:id="@+id/layoutMockNotificationNote"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:layout_marginHorizontal="24dp"
+                        android:background="@drawable/bg_glass_toast"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="7dp">
+
+                        <ImageView
+                            android:layout_width="15dp"
+                            android:layout_height="15dp"
+                            android:src="@drawable/ic_clock"
+                            app:tint="#D4AF37"
+                            android:layout_marginEnd="8dp" />
+
+                        <TextView
+                            android:id="@+id/tvMockNotificationText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="VividWake • Active"
+                            android:textColor="#FFFFFF"
+                            android:textSize="11sp"
+                            android:fontFamily="sans-serif-medium" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/tvPreviewBadge"

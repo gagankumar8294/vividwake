@@ -9,6 +9,7 @@ import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AnimationUtils
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -191,11 +192,12 @@ class StoreWallpaperAdapter(
     inner class StoreViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val card: MaterialCardView = itemView.findViewById(R.id.cardStoreItem)
         private val ivThumb: ImageView = itemView.findViewById(R.id.ivStoreThumb)
+        private val layoutThumbSkeleton: View = itemView.findViewById(R.id.layoutThumbSkeleton)
+        private val viewThumbSkeletonPulse: View = itemView.findViewById(R.id.viewThumbSkeletonPulse)
         private val tvTitle: TextView = itemView.findViewById(R.id.tvStoreTitle)
         private val tvDescription: TextView = itemView.findViewById(R.id.tvStoreDescription)
         private val tvSize: TextView = itemView.findViewById(R.id.tvStoreSize)
         private val tvFeaturedBadge: TextView = itemView.findViewById(R.id.tvStoreFeaturedBadge)
-        private val tvHiddenBadge: TextView = itemView.findViewById(R.id.tvStoreHiddenBadge)
         private val tvDownloadedBadge: TextView = itemView.findViewById(R.id.tvStoreDownloadedBadge)
         private val pbDownload: ProgressBar = itemView.findViewById(R.id.pbStoreDownload)
         private val tvProgress: TextView = itemView.findViewById(R.id.tvStoreProgressText)
@@ -209,6 +211,7 @@ class StoreWallpaperAdapter(
         fun cancelThumbnail() {
             thumbJob?.cancel()
             thumbJob = null
+            viewThumbSkeletonPulse.clearAnimation()
         }
 
         fun bind(item: WallpaperItem) {
@@ -218,7 +221,6 @@ class StoreWallpaperAdapter(
 
             // Badges
             tvFeaturedBadge.visibility = if (item.isFeatured) View.VISIBLE else View.GONE
-            tvHiddenBadge.visibility = if (item.status != "published") View.VISIBLE else View.GONE
             tvDownloadedBadge.visibility = if (item.isDownloaded) View.VISIBLE else View.GONE
 
             val currentProgress = downloadingProgressMap[item.id]
@@ -248,12 +250,12 @@ class StoreWallpaperAdapter(
                 btnDeleteLocal.visibility = View.GONE
             }
 
-            // Click anywhere on card: if downloaded, load preview; if not downloaded, start download
+            // Click anywhere on card: if downloaded, select it; if not downloaded, stream live preview
             card.setOnClickListener {
                 if (item.isDownloaded) {
                     onApply(item)
                 } else {
-                    onDownload(item)
+                    onPreview(item)
                 }
             }
 
@@ -293,17 +295,27 @@ class StoreWallpaperAdapter(
 
         private fun loadThumbnail(item: WallpaperItem) {
             thumbJob?.cancel()
+            viewThumbSkeletonPulse.clearAnimation()
             ivThumb.tag = item.id
 
             // If item has a custom thumbUrl provided, load that lightweight image
             if (item.thumbUrl.isNotBlank()) {
                 val cachedMem = memoryCache.get(item.id)
                 if (cachedMem != null) {
+                    layoutThumbSkeleton.clearAnimation()
+                    layoutThumbSkeleton.visibility = View.GONE
+                    ivThumb.alpha = 1f
+                    ivThumb.visibility = View.VISIBLE
                     ivThumb.setImageBitmap(cachedMem)
                     return
                 }
 
+                // Show skeleton only on the thumbnail frame and pulse while loading
+                layoutThumbSkeleton.visibility = View.VISIBLE
+                layoutThumbSkeleton.alpha = 1f
                 ivThumb.setImageDrawable(null)
+                val pulseAnim = AnimationUtils.loadAnimation(context, R.anim.pulse_skeleton)
+                viewThumbSkeletonPulse.startAnimation(pulseAnim)
 
                 val thumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS).apply { mkdirs() }
                 val cacheFile = File(thumbsDir, "thumb_${item.id}.jpg")
@@ -319,7 +331,7 @@ class StoreWallpaperAdapter(
                         try {
                             val request = Request.Builder()
                                 .url(item.thumbUrl)
-                                .header("User-Agent", "VideoLockScreen-Android")
+                                .header("User-Agent", "VividWake-Android")
                                 .build()
                             httpClient.newCall(request).execute().use { response ->
                                 if (response.isSuccessful) {
@@ -338,13 +350,34 @@ class StoreWallpaperAdapter(
                         null
                     }
 
-                    if (bitmap != null && ivThumb.tag == item.id) {
-                        memoryCache.put(item.id, bitmap)
-                        ivThumb.setImageBitmap(bitmap)
+                    if (ivThumb.tag == item.id) {
+                        if (bitmap != null) {
+                            memoryCache.put(item.id, bitmap)
+                            ivThumb.alpha = 0f
+                            ivThumb.setImageBitmap(bitmap)
+                            ivThumb.visibility = View.VISIBLE
+
+                            // Smooth crossfade from skeleton to real thumbnail
+                            ivThumb.animate().alpha(1f).setDuration(220).start()
+                            layoutThumbSkeleton.animate()
+                                .alpha(0f)
+                                .setDuration(220)
+                                .withEndAction {
+                                    viewThumbSkeletonPulse.clearAnimation()
+                                    layoutThumbSkeleton.visibility = View.GONE
+                                    layoutThumbSkeleton.alpha = 1f
+                                }
+                                .start()
+                        } else {
+                            viewThumbSkeletonPulse.clearAnimation()
+                            layoutThumbSkeleton.visibility = View.GONE
+                            ivThumb.setImageDrawable(null)
+                        }
                     }
                 }
             } else {
-                // Keep the allocated frame space clean and empty as requested
+                viewThumbSkeletonPulse.clearAnimation()
+                layoutThumbSkeleton.visibility = View.GONE
                 ivThumb.setImageDrawable(null)
             }
         }

@@ -5,6 +5,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.RingtoneManager
 import android.os.Build
@@ -15,6 +17,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import java.net.HttpURLConnection
+import java.net.URL
 
 class AppFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -46,6 +50,7 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
         val title = notifPayload?.title ?: data["title"] ?: "New Live Wallpaper"
         val body = notifPayload?.body ?: data["body"] ?: "A new live wallpaper is available in Explore Store!"
         val wallpaperId = data["wallpaperId"]
+        val imageUrl = notifPayload?.imageUrl?.toString() ?: data["imageUrl"] ?: data["bannerUrl"]
         // deliveryType: "system" (status bar only), "in_app" (inbox only), or "both" (default)
         val deliveryType = data["type"] ?: "both"
 
@@ -53,18 +58,18 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
 
         // 1. If in_app or both, save to In-App Notification Center
         if (deliveryType == "in_app" || deliveryType == "both") {
-            notificationManager.addNotification(title, body, wallpaperId)
+            notificationManager.addNotification(title, body, wallpaperId, imageUrl)
             // Broadcast intent to update UI badge in MainActivity if running
             sendBroadcast(Intent(ACTION_NEW_INAPP_NOTIFICATION).setPackage(packageName))
         }
 
-        // 2. If system or both, show Android Status Bar Notification
+        // 2. If system or both, show Android Status Bar Notification with Matching Banner Image
         if (deliveryType == "system" || deliveryType == "both") {
-            showSystemNotification(title, body, wallpaperId)
+            showSystemNotification(title, body, wallpaperId, imageUrl)
         }
     }
 
-    private fun showSystemNotification(title: String, body: String, wallpaperId: String?) {
+    private fun showSystemNotification(title: String, body: String, wallpaperId: String?, imageUrl: String?) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -96,16 +101,44 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Download matching notification banner bitmap if URL is provided
+        var bannerBitmap: Bitmap? = null
+        if (!imageUrl.isNullOrBlank()) {
+            try {
+                val conn = URL(imageUrl).openConnection() as HttpURLConnection
+                conn.doInput = true
+                conn.connectTimeout = 7000
+                conn.readTimeout = 8000
+                conn.connect()
+                conn.inputStream.use { stream ->
+                    bannerBitmap = BitmapFactory.decodeStream(stream)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not download notification banner image: ${e.message}")
+            }
+        }
+
         val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_sparkle)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setSound(defaultSoundUri)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
+
+        if (bannerBitmap != null) {
+            notificationBuilder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(bannerBitmap)
+                    .setBigContentTitle(title)
+                    .setSummaryText(body)
+            )
+            notificationBuilder.setLargeIcon(bannerBitmap)
+        } else {
+            notificationBuilder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        }
 
         notificationManager.notify(System.currentTimeMillis().toInt(), notificationBuilder.build())
     }

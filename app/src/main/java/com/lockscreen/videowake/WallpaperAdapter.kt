@@ -47,7 +47,6 @@ class WallpaperAdapter(
 
     private val items = mutableListOf<WallpaperItem>()
     private var activeId: String = ""
-    var isAdminMode: Boolean = false
 
     private fun matchesId(item: WallpaperItem, targetId: String): Boolean {
         if (targetId.isBlank()) return false
@@ -75,11 +74,9 @@ class WallpaperAdapter(
         if (newPos != -1) notifyItemChanged(newPos)
     }
 
-    override fun getItemCount(): Int = items.size + if (isAdminMode) 1 else 0
+    override fun getItemCount(): Int = items.size
 
-    override fun getItemViewType(position: Int): Int {
-        return if (position < items.size) VIEW_TYPE_ITEM else VIEW_TYPE_ADD
-    }
+    override fun getItemViewType(position: Int): Int = VIEW_TYPE_ITEM
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)

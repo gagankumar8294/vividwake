@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var tvPrimaryInstruction: TextView
     private lateinit var tvActiveWallpaperSubtitle: TextView
     private lateinit var previewTextureView: TextureView
+    private var tvMockNotificationText: TextView? = null
 
     // Tabs & Containers
     private lateinit var btnTabMyWallpapers: MaterialButton
@@ -150,12 +151,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var isSamsung = false
     private var isXiaomi = false
     private var isColorOS = false
-    private var isAdminMode = false
-    private var titleClickCount = 0
-    private var lastTitleClickTime = 0L
+    private var isVivo = false
+    private var isHuawei = false
+    private var isTranssion = false
 
     private var isWallpaperSelectedForApply = false
     private var selectedWallpaperItem: WallpaperItem? = null
+    private var isOptionalUpdatePrompted = false
 
     private val notifReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -168,19 +170,37 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun showAuthLoading(message: String = "Connecting to Google...") {
         if (isFinishing || isDestroyed) return
         try {
+            val titleText = when {
+                message.contains("Opening", ignoreCase = true) -> "Connecting to Google"
+                message.contains("Authenticating", ignoreCase = true) -> "Authenticating Account"
+                message.contains("Verifying", ignoreCase = true) -> "Verifying Device Security"
+                else -> message
+            }
+            val subtitleText = when {
+                message.contains("Opening", ignoreCase = true) -> "Opening secure account chooser..."
+                message.contains("Authenticating", ignoreCase = true) -> "Syncing Google profile & security tokens..."
+                message.contains("Verifying", ignoreCase = true) -> "Checking 1-to-1 device authorization..."
+                else -> "Securing your session, please wait..."
+            }
+
             if (authLoadingDialog == null) {
                 val view = layoutInflater.inflate(R.layout.dialog_auth_loading, null)
                 val tvMsg = view.findViewById<TextView>(R.id.tvLoadingMessage)
-                tvMsg.text = message
+                val tvSub = view.findViewById<TextView>(R.id.tvLoadingSubtitle)
+                tvMsg.text = titleText
+                tvSub?.text = subtitleText
                 authLoadingDialog = AlertDialog.Builder(this)
                     .setView(view)
                     .setCancelable(false)
                     .create().apply {
                         window?.setBackgroundDrawableResource(android.R.color.transparent)
+                        window?.setGravity(android.view.Gravity.CENTER)
                     }
             } else {
                 val tvMsg = authLoadingDialog?.findViewById<TextView>(R.id.tvLoadingMessage)
-                tvMsg?.text = message
+                val tvSub = authLoadingDialog?.findViewById<TextView>(R.id.tvLoadingSubtitle)
+                tvMsg?.text = titleText
+                tvSub?.text = subtitleText
             }
             authLoadingDialog?.show()
         } catch (_: Exception) {}
@@ -245,6 +265,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             showTransferRequestDialog(userEmail, verifyResult.boundDevice, verifyResult.transferRequestStatus)
                             return@launch
                         }
+                        is DeviceVerificationResult.DeviceLockedToAnotherEmail -> {
+                            authManager.signOut {}
+                            analytics.logAction("device_lock_blocked", "FAILED", duration, mapOf(
+                                "attemptedEmail" to userEmail,
+                                "boundEmail" to verifyResult.boundEmail,
+                                "error" to verifyResult.errorMessage
+                            ))
+                            analytics.flushSync()
+                            updateUserAuthUI()
+                            showDeviceLockedToAuthorizedEmailDialog(verifyResult.boundEmail)
+                            return@launch
+                        }
                         is DeviceVerificationResult.Blocked -> {
                             // Device or Email is bound to someone else!
                             // Immediately sign out to prevent unauthorized access
@@ -255,7 +287,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             ))
                             analytics.flushSync()
                             updateUserAuthUI()
-                            showAuthErrorDialog(verifyResult.title, verifyResult.reason)
+
+                            val emailMatch = Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}").find(verifyResult.reason)
+                            if (emailMatch != null) {
+                                showDeviceLockedToAuthorizedEmailDialog(emailMatch.value)
+                            } else {
+                                showAuthErrorDialog(verifyResult.title, verifyResult.reason)
+                            }
                             return@launch
                         }
                         is DeviceVerificationResult.Error -> {
@@ -281,7 +319,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                         "email" to (user?.email ?: "")
                     ))
                     analytics.flushSync()
-                    Toast.makeText(this@MainActivity, "Welcome, $name!", Toast.LENGTH_SHORT).show()
+                    showGlassToast("Welcome, $name! • Google Account Linked", isSuccess = true)
                     updateUserAuthUI()
                 } else {
                     hideAuthLoading()
@@ -354,6 +392,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvPrimaryInstruction = findViewById(R.id.tvPrimaryInstruction)
         tvActiveWallpaperSubtitle = findViewById(R.id.tvActiveWallpaperSubtitle)
         previewTextureView = findViewById(R.id.previewTextureView)
+        tvMockNotificationText = findViewById(R.id.tvMockNotificationText)
 
         btnTabMyWallpapers = findViewById(R.id.btnTabMyWallpapers)
         btnTabExploreStore = findViewById(R.id.btnTabExploreStore)
@@ -401,7 +440,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         loadSavedSettings()
         setupTabSwitching()
         setupListeners()
-        setupAdminSecretGesture()
+        setupHeaderControls()
 
         // Check if opened from notification
         if (intent?.getStringExtra("open_tab") == "store") {
@@ -419,6 +458,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 brand.contains("redmi") || brand.contains("poco")
         isColorOS = manufacturer.contains("oneplus") || manufacturer.contains("oppo") ||
                 manufacturer.contains("realme")
+        isVivo = manufacturer.contains("vivo") || manufacturer.contains("iqoo") ||
+                brand.contains("vivo") || brand.contains("iqoo")
+        isHuawei = manufacturer.contains("huawei") || manufacturer.contains("honor") ||
+                brand.contains("huawei") || brand.contains("honor")
+        isTranssion = manufacturer.contains("transsion") || manufacturer.contains("infinix") ||
+                manufacturer.contains("tecno") || manufacturer.contains("itel")
 
         when {
             isSamsung -> {
@@ -431,12 +476,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
             isColorOS -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-                tvDeviceBrand.text = "Detected: $brandName (OxygenOS / ColorOS)"
+                tvDeviceBrand.text = "Detected: $brandName (OxygenOS / ColorOS / Realme UI)"
                 tvPrimaryInstruction.text = "Select 'Home and Lock screen'. Note: turn off 'Lock Screen Magazine' if it reverts."
+            }
+            isVivo -> {
+                val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                tvDeviceBrand.text = "Detected: $brandName (Funtouch OS / OriginOS)"
+                tvPrimaryInstruction.text = "Select 'Home and Lock screen'. Note: turn off 'Lock Screen Poster' if it reverts."
+            }
+            isHuawei -> {
+                val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                tvDeviceBrand.text = "Detected: $brandName (EMUI / MagicOS)"
+                tvPrimaryInstruction.text = "Choose 'Set as Lock screen and Home screen'. Turn off 'Magazine Unlock' in Settings if enabled."
+            }
+            isTranssion -> {
+                val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+                tvDeviceBrand.text = "Detected: $brandName (XOS / HiOS)"
+                tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Both Home & Lock screen'"
             }
             else -> {
                 val brandName = Build.MANUFACTURER.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-                tvDeviceBrand.text = "Detected: $brandName (Native AOSP)"
+                tvDeviceBrand.text = "Detected: $brandName (Native AOSP / Clean UI)"
                 tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
             }
         }
@@ -470,7 +530,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
-    private fun showGlassToast(message: String, isSuccess: Boolean = true) {
+    private fun showGlassToast(message: String, isSuccess: Boolean = true, iconRes: Int = R.drawable.ic_clock) {
         try {
             val inflater = LayoutInflater.from(this)
             val view = inflater.inflate(R.layout.view_glass_toast, null)
@@ -478,7 +538,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val tvMsg: TextView = view.findViewById(R.id.tvToastMessage)
 
             tvMsg.text = message
-            ivIcon.setImageResource(if (isSuccess) R.drawable.ic_sparkle else R.drawable.ic_check)
+            ivIcon.setImageResource(iconRes)
             ivIcon.imageTintList = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
 
             val toast = Toast(this)
@@ -580,7 +640,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         )
 
         rvWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        adapter.isAdminMode = isAdminMode
         rvWallpapers.adapter = adapter
         refreshGallery()
     }
@@ -628,7 +687,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         rvStoreWallpapers.visibility = View.GONE
         lifecycleScope.launch {
             try {
-                fullCatalogList = catalogRepo.fetchCatalog(isAdminMode)
+                val currentUser = authManager.currentUser
+                val userEmail = currentUser?.email
+                val userId = currentUser?.uid
+                val assignedIds = prefs.getStringSet("assigned_wallpaper_ids", emptySet()) ?: emptySet()
+                fullCatalogList = catalogRepo.fetchCatalog(userEmail, userId, assignedIds)
                 layoutStoreSkeleton.clearAnimation()
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
@@ -636,24 +699,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 setupStoreCategoryChips()
                 applyCategoryFilter(currentStoreCategory)
 
-                if (isAdminMode) {
-                    tvStoreCatalogHeader.text = "ADMIN CATALOG (${fullCatalogList.size} wallpapers, drafts visible)"
+                if (fullCatalogList.isEmpty()) {
+                    tvStoreCatalogHeader.text = "No wallpapers available yet. Check back soon!"
                 } else {
                     tvStoreCatalogHeader.text = "Tap card to stream preview. Download to set as wallpaper."
                 }
                 val duration = System.currentTimeMillis() - start
                 analytics.logAction("store_catalog_fetch", "SUCCESS", duration, mapOf(
-                    "count" to fullCatalogList.size,
-                    "isAdminMode" to isAdminMode
+                    "count" to fullCatalogList.size
                 ))
             } catch (e: Exception) {
                 layoutStoreSkeleton.clearAnimation()
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
                 val duration = System.currentTimeMillis() - start
-                analytics.logAction("store_catalog_fetch", "FAILED", duration, mapOf(
-                    "isAdminMode" to isAdminMode
-                ), e)
+                analytics.logAction("store_catalog_fetch", "FAILED", duration, emptyMap(), e)
             }
         }
     }
@@ -853,7 +913,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun showCategoryBottomSheetDialog() {
-        val bottomSheet = BottomSheetDialog(this)
+        val bottomSheet = BottomSheetDialog(this, R.style.Theme_VideoLockScreen_BottomSheetDialog)
         val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_categories, null)
         bottomSheet.setContentView(sheetView)
 
@@ -922,6 +982,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun downloadCloudWallpaper(item: WallpaperItem) {
+        if (!authManager.isUserSignedIn) {
+            showAuthRequiredDialog()
+            return
+        }
         val start = System.currentTimeMillis()
         analytics.logAction("download_start", "SUCCESS", 0, mapOf(
             "id" to item.id,
@@ -1007,22 +1071,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .show()
     }
 
-    private fun setupAdminSecretGesture() {
-        tvAppTitle.setOnClickListener {
-            val now = System.currentTimeMillis()
-            if (now - lastTitleClickTime < 1000) {
-                titleClickCount++
-            } else {
-                titleClickCount = 1
-            }
-            lastTitleClickTime = now
-
-            if (titleClickCount >= 5) {
-                titleClickCount = 0
-                showAdminPinDialog()
-            }
-        }
-
+    private fun setupHeaderControls() {
         btnUserAuth.setOnClickListener {
             showUserAuthDialog()
         }
@@ -1030,34 +1079,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnNotificationCenter.setOnClickListener {
             showInAppNotificationsDialog()
         }
-    }
-
-    private fun showAdminPinDialog() {
-        val input = EditText(this).apply {
-            hint = "Enter Admin PIN"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Admin Secret Mode")
-            .setMessage("Enter Admin PIN to view unpublished/draft wallpapers:")
-            .setView(input)
-            .setPositiveButton("Unlock") { _, _ ->
-                val entered = input.text.toString().trim()
-                if (entered == CloudConfig.ADMIN_SECRET_PIN) {
-                    isAdminMode = !isAdminMode
-                    val modeText = if (isAdminMode) "Admin Mode ENABLED" else "Guest Mode Restored"
-                    tvAppTitle.text = if (isAdminMode) "VividWake (Admin)" else "Lock Screen Video"
-                    Toast.makeText(this, modeText, Toast.LENGTH_SHORT).show()
-                    adapter.isAdminMode = isAdminMode
-                    adapter.notifyDataSetChanged()
-                    loadStoreCatalog()
-                } else {
-                    Toast.makeText(this, "Incorrect Admin PIN", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     private fun loadProfileAvatar(
@@ -1113,7 +1134,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun showAccountProfileDialog() {
         val user = authManager.currentUser ?: return
-        val dialog = BottomSheetDialog(this)
+        val dialog = BottomSheetDialog(this, R.style.Theme_VideoLockScreen_BottomSheetDialog)
         val view = layoutInflater.inflate(R.layout.dialog_account_profile, null)
         dialog.setContentView(view)
 
@@ -1122,7 +1143,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val tvName = view.findViewById<TextView>(R.id.dialogTvUserName)
         val tvEmail = view.findViewById<TextView>(R.id.dialogTvUserEmail)
         val tvAssigned = view.findViewById<TextView>(R.id.dialogTvAssignedCount)
-        val btnClose = view.findViewById<TextView>(R.id.btnCloseProfileDialog)
+        val btnClose = view.findViewById<View>(R.id.btnCloseProfileDialog)
         val btnSwitch = view.findViewById<MaterialButton>(R.id.dialogBtnSwitchAccount)
         val btnSignOut = view.findViewById<MaterialButton>(R.id.dialogBtnSignOut)
 
@@ -1151,6 +1172,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 runOnUiThread {
                     updateUserAuthUI()
                     refreshGallery()
+                    loadStoreCatalog()
                     try {
                         showAuthLoading("Opening Google Sign-In...")
                         googleSignInLauncher.launch(authManager.getSignInIntent())
@@ -1177,6 +1199,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                         runOnUiThread {
                             updateUserAuthUI()
                             refreshGallery()
+                            loadStoreCatalog()
                             Toast.makeText(this, "Signed out. Active wallpaper preserved.", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -1227,6 +1250,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             // Listen to real-time wallpaper assignments from admin
             authManager.listenToAssignedWallpapers { assignedList ->
                 prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
+                runOnUiThread {
+                    loadStoreCatalog()
+                }
             }
         } else {
             // Header Pill Button
@@ -1252,7 +1278,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val count = inAppNotificationManager.getUnreadCount()
         analytics.logAction("notification_bell_clicked", "SUCCESS", System.currentTimeMillis() - bellStart, mapOf("unreadCount" to count))
 
-        val dialog = BottomSheetDialog(this)
+        val dialog = BottomSheetDialog(this, R.style.Theme_VideoLockScreen_BottomSheetDialog)
         val view = layoutInflater.inflate(R.layout.dialog_inapp_notifications, null)
         dialog.setContentView(view)
 
@@ -1333,7 +1359,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 "title" to item.title,
                 "category" to item.category
             ))
-            showGlassToast("Selected '${item.title}'! Tap 'Apply to Lock Screen' below to apply to phone")
+            tvMockNotificationText?.text = "${item.title} • Lock Screen Active"
+            showGlassToast("Selected '${item.title}' • Tap 'Set wallpaper' below", iconRes = R.drawable.ic_clock)
         } catch (e: Exception) {
             val duration = System.currentTimeMillis() - start
             analytics.logAction("wallpaper_selected", "FAILED", duration, mapOf(
@@ -1443,6 +1470,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
             val start = System.currentTimeMillis()
             val activeItem = selectedWallpaperItem ?: repository.getActiveWallpaper()
+            showGlassToast("Applying '${activeItem.title}' • Choose 'Home and lock screen'", iconRes = R.drawable.ic_clock)
             try {
                 when {
                     isSamsung -> {
@@ -1720,8 +1748,17 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 } else {
                     val f = File(activeItem.filePath)
                     if (f.exists()) {
-                        FileInputStream(f).use { input ->
-                            input.copyTo(output)
+                        if (VaultSecurityManager.isScrambled(f)) {
+                            val tempExport = File(cacheDir, "temp_export_${f.name}")
+                            VaultSecurityManager.descrambleToFile(f, tempExport)
+                            FileInputStream(tempExport).use { input ->
+                                input.copyTo(output)
+                            }
+                            tempExport.delete()
+                        } else {
+                            FileInputStream(f).use { input ->
+                                input.copyTo(output)
+                            }
                         }
                     }
                 }
@@ -1980,6 +2017,49 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .show()
     }
 
+    private fun showDeviceLockedToAuthorizedEmailDialog(boundEmail: String) {
+        if (isFinishing || isDestroyed) return
+        try {
+            val view = layoutInflater.inflate(R.layout.dialog_device_locked, null)
+            val dialog = AlertDialog.Builder(this)
+                .setView(view)
+                .setCancelable(true)
+                .create()
+
+            val tvAuthorizedEmail = view.findViewById<TextView>(R.id.tvAuthorizedEmail)
+            val btnSignInWithAuthorized = view.findViewById<View>(R.id.btnSignInWithAuthorized)
+            val btnClose = view.findViewById<View>(R.id.btnCloseDeviceLock)
+
+            tvAuthorizedEmail.text = boundEmail
+
+            btnSignInWithAuthorized.setOnClickListener {
+                dialog.dismiss()
+                try {
+                    showAuthLoading("Connecting to Google...")
+                    googleSignInLauncher.launch(authManager.getSignInIntent())
+                } catch (e: Exception) {
+                    hideAuthLoading()
+                    showAuthErrorDialog("Error", "Could not open Google Sign-In: ${e.localizedMessage}")
+                }
+            }
+
+            btnClose.setOnClickListener {
+                dialog.dismiss()
+            }
+
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            dialog.window?.setGravity(Gravity.CENTER)
+            dialog.show()
+            dialog.window?.setLayout(
+                (resources.displayMetrics.density * 340).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to show device locked dialog", e)
+            showAuthErrorDialog("Device Locked", "Please use $boundEmail to log in on this device.")
+        }
+    }
+
     private fun showBannedDeviceDialog(reason: String, userEmail: String) {
         AlertDialog.Builder(this)
             .setTitle("Access Restricted")
@@ -2055,10 +2135,62 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private fun showAuthRequiredDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Account Required 🔒")
+            .setMessage("Sign in with your Google account to download 4K live wallpapers and bind your device security license.")
+            .setPositiveButton("Sign In") { _, _ ->
+                try {
+                    showAuthLoading("Opening Google Sign-In...")
+                    googleSignInLauncher.launch(authManager.getSignInIntent())
+                } catch (e: Exception) {
+                    hideAuthLoading()
+                    showAuthErrorDialog("Error", "Could not open Google Sign-In: ${e.localizedMessage}")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun checkVersionGate() {
+        val gateManager = VersionGateManager(this)
+        lifecycleScope.launch {
+            val result = gateManager.checkVersion() ?: return@launch
+            if (result.isForceUpdateRequired) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(result.title)
+                    .setMessage(result.message)
+                    .setCancelable(false)
+                    .setPositiveButton("Update Now") { _, _ ->
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.downloadUrl))
+                            startActivity(intent)
+                        } catch (_: Exception) {}
+                        finish()
+                    }
+                    .show()
+            } else if (result.isOptionalUpdateAvailable && !isOptionalUpdatePrompted) {
+                isOptionalUpdatePrompted = true
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle(result.title)
+                    .setMessage(result.message)
+                    .setPositiveButton("Update") { _, _ ->
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(result.downloadUrl))
+                            startActivity(intent)
+                        } catch (_: Exception) {}
+                    }
+                    .setNegativeButton("Later", null)
+                    .show()
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updateNotificationBadge()
         updateUserAuthUI()
+        checkVersionGate()
 
         val filter = IntentFilter(AppFirebaseMessagingService.ACTION_NEW_INAPP_NOTIFICATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

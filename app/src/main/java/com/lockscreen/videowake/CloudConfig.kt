@@ -7,7 +7,6 @@ object CloudConfig {
 
     var CATALOG_URL: String = "https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json"
     var ANALYTICS_BASE_URL: String = "https://vividwake-backend.onrender.com"
-    const val ADMIN_SECRET_PIN: String = "7788"
 
     const val FOLDER_WALLPAPERS: String = "wallpapers"
     const val FOLDER_THUMBS: String = "thumbs"
@@ -22,7 +21,7 @@ object CloudConfig {
         "category": "Gaming",
         "description": "High-energy animated game character live lock screen wallpaper.",
         "tags": ["gaming", "action", "anime", "character", "cyberpunk"],
-        "status": "published",
+        "status": "draft",
         "isFeatured": true,
         "isVipOnly": false,
         "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Animating_game_character_wallpaper_20261024075106.mp4",
@@ -40,7 +39,7 @@ object CloudConfig {
         "category": "Norse",
         "description": "8-second cinematic loop of a Viking warrior standing in cold mountain fjord breeze.",
         "tags": ["viking", "norse", "ragnarok", "ragnar", "valhalla", "warrior", "fjord", "nordic", "axe", "odin", "mythology"],
-        "status": "published",
+        "status": "draft",
         "isFeatured": true,
         "isVipOnly": false,
         "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Create_Viking_live_wallpaper_20261026075151.mp4",
@@ -58,7 +57,7 @@ object CloudConfig {
         "category": "PUBG",
         "description": "Cinematic lone soldier standing on the battlefield amidst dense battle smoke.",
         "tags": ["pubg", "battleground", "soldier", "battlefield", "survivor", "military", "warzone", "fps", "action"],
-        "status": "published",
+        "status": "draft",
         "isFeatured": true,
         "isVipOnly": false,
         "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/Soldier_live_wallpaper_animation_20261027214920.mp4",

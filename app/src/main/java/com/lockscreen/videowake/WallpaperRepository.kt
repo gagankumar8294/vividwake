@@ -299,7 +299,17 @@ class WallpaperRepository(private val context: Context) {
                 videoFile
             } else {
                 val f = File(item.filePath)
-                if (f.exists()) f else null
+                if (!f.exists()) return null
+                if (VaultSecurityManager.isScrambled(f)) {
+                    val shareDir = File(context.cacheDir, "shared_handoff").apply { mkdirs() }
+                    val shareFile = File(shareDir, "handoff_${f.name}")
+                    if (!shareFile.exists() || shareFile.length() != f.length()) {
+                        VaultSecurityManager.descrambleToFile(f, shareFile)
+                    }
+                    shareFile
+                } else {
+                    f
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting file for share", e)

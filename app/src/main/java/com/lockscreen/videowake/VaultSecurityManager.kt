@@ -85,6 +85,38 @@ object VaultSecurityManager {
     }
 
     /**
+     * Descrambles a file to a new destination file (used for Samsung / Xiaomi direct hand-off or user export).
+     * The original encrypted file in private sandbox is never modified.
+     */
+    fun descrambleToFile(sourceFile: File, destFile: File): Boolean {
+        if (!sourceFile.exists()) return false
+        return try {
+            sourceFile.inputStream().use { input ->
+                destFile.outputStream().use { output ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    var totalWritten = 0L
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        for (i in 0 until bytesRead) {
+                            val pos = totalWritten + i
+                            if (pos < SCRAMBLE_BYTE_COUNT) {
+                                val keyByte = SCRAMBLE_KEY[(pos % SCRAMBLE_KEY.size).toInt()]
+                                buffer[i] = (buffer[i].toInt() xor keyByte.toInt()).toByte()
+                            }
+                        }
+                        output.write(buffer, 0, bytesRead)
+                        totalWritten += bytesRead
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error descrambling to file: ${destFile.name}", e)
+            false
+        }
+    }
+
+    /**
      * Checks if the file header looks like a raw MP4 (starts with 'ftyp' at offset 4).
      * If not, it is considered scrambled/encrypted in our sandbox.
      */
@@ -263,7 +295,11 @@ object VaultSecurityManager {
             var purgedCount = 0
             cloudDir.listFiles()?.forEach { file ->
                 // Never delete the currently active wallpaper!
-                val isActive = activeFile != null && file.absolutePath == activeFile.absolutePath
+                val isActive = activeFile != null && (
+                    file.name == activeFile.name || 
+                    file.canonicalPath == activeFile.canonicalPath ||
+                    file.absolutePath == activeFile.absolutePath
+                )
                 if (!isActive && file.isFile && file.name.startsWith("cloud_")) {
                     val deleted = file.delete()
                     if (deleted) purgedCount++
@@ -272,7 +308,13 @@ object VaultSecurityManager {
 
             // Clear local cached download IDs in preferences except active
             val activeId = prefs.getString(VideoWallpaperService.KEY_ACTIVE_ID, "") ?: ""
-            val activeCloudId = if (activeId.startsWith("cloud_")) activeId.removePrefix("cloud_") else null
+            val activeCloudId = when {
+                activeFile != null && activeFile.name.startsWith("cloud_") ->
+                    activeFile.nameWithoutExtension.removePrefix("cloud_")
+                activeId.startsWith("cloud_") ->
+                    activeId.removePrefix("cloud_")
+                else -> null
+            }
 
             val downloadPrefs = context.getSharedPreferences("cloud_downloads_meta", Context.MODE_PRIVATE)
             if (activeCloudId != null) {

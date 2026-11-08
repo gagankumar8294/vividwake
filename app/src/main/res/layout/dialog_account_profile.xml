@@ -3,134 +3,170 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#191428"
+    android:background="@drawable/bg_glass_toast"
+    android:backgroundTint="#130F24"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:paddingStart="24dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="28dp">
 
-    <!-- Drag Handle -->
+    <!-- Modern BottomSheet Drag Pill -->
     <View
-        android:layout_width="40dp"
-        android:layout_height="4dp"
+        android:layout_width="48dp"
+        android:layout_height="5dp"
         android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="18dp"
         android:background="@drawable/bg_glass_toast"
-        android:backgroundTint="#44FFFFFF" />
+        android:backgroundTint="#3D305C" />
 
-    <!-- Top Row: Title & Close -->
+    <!-- Top Header Bar: Title with Google 'G' & Close Button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Google"
+            android:src="@drawable/ic_google" />
+
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
             android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
             android:text="Google Account"
-            android:textColor="#D4AF37"
+            android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <TextView
+        <!-- Circular Close Button with Ripple -->
+        <FrameLayout
             android:id="@+id/btnCloseProfileDialog"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_glass_toast"
+            android:backgroundTint="#201938"
             android:clickable="true"
-            android:focusable="true"
-            android:padding="8dp"
-            android:text="✕"
-            android:textColor="#B0A8C0"
-            android:textSize="18sp" />
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:fontFamily="sans-serif-medium"
+                android:text="✕"
+                android:textColor="#B0A8C0"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- Centered User Avatar & Info Card -->
+    <!-- Centered User Avatar & Credentials Card -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        app:cardBackgroundColor="#221C38"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="4dp"
-        app:strokeColor="#3D3254"
-        app:strokeWidth="1dp">
+        android:layout_marginTop="18dp"
+        app:cardBackgroundColor="#1C1635"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="6dp"
+        app:strokeColor="#3E3060"
+        app:strokeWidth="1.2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:paddingStart="20dp"
+            android:paddingTop="24dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="24dp">
 
-            <!-- Avatar -->
+            <!-- Avatar with Premium Dual-Ring Accent -->
             <FrameLayout
-                android:layout_width="72dp"
-                android:layout_height="72dp">
+                android:layout_width="80dp"
+                android:layout_height="80dp">
 
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/dialogIvUserAvatar"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
                     android:scaleType="centerCrop"
                     app:shapeAppearanceOverlay="@style/ShapeAppearance.Circle"
                     app:strokeColor="#D4AF37"
-                    app:strokeWidth="2dp" />
+                    app:strokeWidth="2.5dp" />
 
                 <TextView
                     android:id="@+id/dialogTvAvatarInitial"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
                     android:background="@drawable/bg_circle_avatar"
+                    android:fontFamily="sans-serif-medium"
                     android:gravity="center"
                     android:text="U"
                     android:textColor="#FFFFFF"
-                    android:textSize="32sp"
+                    android:textSize="34sp"
                     android:textStyle="bold" />
             </FrameLayout>
 
+            <!-- User Display Name -->
             <TextView
                 android:id="@+id/dialogTvUserName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
                 android:text="User Name"
                 android:textColor="#FFFFFF"
-                android:textSize="17sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
 
+            <!-- User Email Address -->
             <TextView
                 android:id="@+id/dialogTvUserEmail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
                 android:text="user@gmail.com"
                 android:textColor="#B0A8C0"
-                android:textSize="13sp" />
+                android:textSize="13.5sp" />
 
-            <!-- Google Account Badge -->
+            <!-- Official Google Verified Badge -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_glass_toast"
+                android:backgroundTint="#271E47"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="5dp">
+                android:paddingStart="12dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="5dp">
 
                 <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:contentDescription="Verified"
                     android:src="@drawable/ic_google" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:text="Google Signed In"
-                    android:textColor="#E0E0E0"
-                    android:textSize="11sp" />
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Verified Google Identity"
+                    android:textColor="#E2E8F0"
+                    android:textSize="11.5sp" />
             </LinearLayout>
 
         </LinearLayout>
@@ -140,18 +176,19 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        app:cardBackgroundColor="#1A152B"
-        app:cardCornerRadius="14dp"
-        app:strokeColor="#2F2547"
+        android:layout_marginTop="14dp"
+        app:cardBackgroundColor="#17122D"
+        app:cardCornerRadius="18dp"
+        app:strokeColor="#2F244E"
         app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="14dp">
+            android:padding="16dp">
 
+            <!-- Row 1: Cloud Sync Status -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -159,35 +196,37 @@
                 android:orientation="horizontal">
 
                 <View
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
+                    android:layout_width="9dp"
+                    android:layout_height="9dp"
                     android:background="@drawable/bg_circle_indicator_green" />
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
                     android:text="Cloud Sync Status"
                     android:textColor="#FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+                    android:textSize="13.5sp" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Active • Spark Free"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Active • Real-time"
                     android:textColor="#10B981"
-                    android:textSize="12sp"
+                    android:textSize="12.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginVertical="10dp"
-                android:background="#2F2547" />
+                android:layout_marginVertical="12dp"
+                android:background="#261E40" />
 
+            <!-- Row 2: Personalized Wallpapers -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -197,14 +236,16 @@
                 <ImageView
                     android:layout_width="16dp"
                     android:layout_height="16dp"
+                    android:contentDescription="Assigned"
                     android:src="@drawable/ic_sparkle"
                     app:tint="#D4AF37" />
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
+                    android:fontFamily="sans-serif"
                     android:text="Personalized Wallpapers"
                     android:textColor="#B0A8C0"
                     android:textSize="13sp" />
@@ -213,16 +254,17 @@
                     android:id="@+id/dialogTvAssignedCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
                     android:text="0 Assigned"
                     android:textColor="#D4AF37"
-                    android:textSize="12sp"
+                    android:textSize="12.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Buttons -->
+    <!-- Bottom Action Buttons: Switch Account & Sign Out -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -234,29 +276,31 @@
             android:id="@+id/dialogBtnSwitchAccount"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="50dp"
             android:layout_marginEnd="6dp"
             android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
             android:text="Switch Account"
             android:textColor="#D4AF37"
-            android:textSize="12sp"
-            app:cornerRadius="12dp"
+            android:textSize="12.5sp"
+            app:cornerRadius="14dp"
             app:strokeColor="#D4AF37"
-            app:strokeWidth="1dp" />
+            app:strokeWidth="1.2dp" />
 
-        <!-- Sign Out Button (DriveNotes Red Style) -->
+        <!-- Sign Out Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/dialogBtnSignOut"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="50dp"
             android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:backgroundTint="#EF4444"
+            android:fontFamily="sans-serif-medium"
             android:text="Sign Out"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="12.5sp"
             android:textStyle="bold"
-            app:cornerRadius="12dp"
+            app:cornerRadius="14dp"
             app:icon="@drawable/ic_logout"
             app:iconGravity="textStart"
             app:iconSize="16dp"

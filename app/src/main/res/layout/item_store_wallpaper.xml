@@ -39,6 +39,29 @@
                     android:contentDescription="Wallpaper Thumbnail"
                     android:scaleType="centerCrop" />
 
+                <!-- Skeleton Placeholder: Visible only while thumbnail is loading -->
+                <FrameLayout
+                    android:id="@+id/layoutThumbSkeleton"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_skeleton_thumb"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/viewThumbSkeletonPulse"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_skeleton_shimmer_gradient" />
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_video_placeholder"
+                        app:tint="#6D5A9E"
+                        android:alpha="0.5" />
+                </FrameLayout>
+
                 <!-- Featured Badge -->
                 <TextView
                     android:id="@+id/tvStoreFeaturedBadge"
@@ -55,21 +78,6 @@
                     android:textStyle="bold"
                     android:visibility="gone" />
 
-                <!-- Admin Hidden Badge -->
-                <TextView
-                    android:id="@+id/tvStoreHiddenBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom|start"
-                    android:layout_margin="4dp"
-                    android:background="#B45309"
-                    android:paddingHorizontal="5dp"
-                    android:paddingVertical="2dp"
-                    android:text="DRAFT"
-                    android:textColor="#FFFFFF"
-                    android:textSize="9sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
 
                 <!-- Downloaded Check Badge -->
                 <TextView

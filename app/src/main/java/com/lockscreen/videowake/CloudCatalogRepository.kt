@@ -25,26 +25,40 @@ class CloudCatalogRepository(
     }
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(25, TimeUnit.SECONDS)
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
-    suspend fun fetchCatalog(isAdminMode: Boolean = false): List<WallpaperItem> = withContext(Dispatchers.IO) {
+    suspend fun fetchCatalog(
+        userEmail: String? = null,
+        userId: String? = null,
+        assignedIds: Set<String> = emptySet()
+    ): List<WallpaperItem> = withContext(Dispatchers.IO) {
         // Clear any old legacy cache file if it exists
         try {
             val oldCache = File(context.filesDir, "catalog_cache.json")
             if (oldCache.exists()) oldCache.delete()
         } catch (_: Exception) {}
 
-        val jsonString = fetchRemoteJsonOrFallback()
-        parseCatalog(jsonString, isAdminMode)
+        val jsonString = fetchRemoteJsonOrFallback(userEmail, userId)
+        parseCatalog(jsonString, userEmail, userId, assignedIds)
     }
 
-    private fun fetchRemoteJsonOrFallback(): String {
+    private fun fetchRemoteJsonOrFallback(userEmail: String?, userId: String?): String {
+        val params = mutableListOf<String>()
+        if (!userEmail.isNullOrBlank()) {
+            params.add("userEmail=" + java.net.URLEncoder.encode(userEmail, "UTF-8"))
+        }
+        if (!userId.isNullOrBlank()) {
+            params.add("userId=" + java.net.URLEncoder.encode(userId, "UTF-8"))
+        }
+        val queryStr = if (params.isNotEmpty()) "?" + params.joinToString("&") else ""
+
         val urls = listOf(
-            CloudConfig.CATALOG_URL,
-            "https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json",
-            "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/wallpapers.json"
+            "${CloudConfig.ANALYTICS_BASE_URL}/api/wallpapers/catalog$queryStr",
+            "http://127.0.0.1:5000/api/wallpapers/catalog$queryStr",
+            "https://raw.githubusercontent.com/gagankumar8294/vividwake/main/wallpapers.json",
+            "https://cdn.jsdelivr.net/gh/gagankumar8294/vividwake@main/wallpapers.json"
         ).distinct()
 
         for (baseUrl in urls) {
@@ -86,7 +100,12 @@ class CloudCatalogRepository(
         }
     }
 
-    private fun parseCatalog(jsonString: String, isAdminMode: Boolean): List<WallpaperItem> {
+    private fun parseCatalog(
+        jsonString: String,
+        userEmail: String? = null,
+        userId: String? = null,
+        assignedIds: Set<String> = emptySet()
+    ): List<WallpaperItem> {
         val list = mutableListOf<WallpaperItem>()
         try {
             val downloadedIds = downloadManager.getDownloadedIds()
@@ -97,7 +116,7 @@ class CloudCatalogRepository(
                 val title = obj.optString("title", "Cloud Wallpaper")
                 val category = obj.optString("category", "General")
                 val description = obj.optString("description", "")
-                val status = obj.optString("status", "published")
+                val status = obj.optString("status", "draft")
                 val isFeatured = obj.optBoolean("isFeatured", false)
                 val isVipOnly = obj.optBoolean("isVipOnly", false)
                 val videoUrl = obj.optString("videoUrl", "")
@@ -117,10 +136,44 @@ class CloudCatalogRepository(
                     }
                 }
 
-                // Visibility rule:
-                // Non-admin sees ONLY "published".
-                // Admin sees "published", "hidden", and "draft".
-                if (!isAdminMode && status != "published") {
+                val allowedUsersList = mutableListOf<String>()
+                val allowedArr = obj.optJSONArray("allowedUsers")
+                if (allowedArr != null) {
+                    for (u in 0 until allowedArr.length()) {
+                        val uStr = allowedArr.optString(u)?.lowercase()?.trim()
+                        if (!uStr.isNullOrBlank()) allowedUsersList.add(uStr)
+                    }
+                }
+
+                val blockedUsersList = mutableListOf<String>()
+                val blockedArr = obj.optJSONArray("blockedUsers")
+                if (blockedArr != null) {
+                    for (u in 0 until blockedArr.length()) {
+                        val uStr = blockedArr.optString(u)?.lowercase()?.trim()
+                        if (!uStr.isNullOrBlank()) blockedUsersList.add(uStr)
+                    }
+                }
+
+                val normEmail = userEmail?.lowercase()?.trim() ?: ""
+                val normUid = userId?.trim() ?: ""
+
+                // 1. Explicitly blocked check
+                val isBlocked = (normEmail.isNotBlank() && blockedUsersList.contains(normEmail)) ||
+                                (normUid.isNotBlank() && blockedUsersList.contains(normUid))
+                if (isBlocked) {
+                    continue
+                }
+
+                // 2. Explicitly allowed check
+                val isExplicitlyAllowed = (normEmail.isNotBlank() && allowedUsersList.contains(normEmail)) ||
+                                         (normUid.isNotBlank() && allowedUsersList.contains(normUid)) ||
+                                         assignedIds.contains(id)
+
+                // 3. User Visibility rule:
+                // Normal users on mobile see published wallpapers (unless blocked)
+                // Draft / Restricted wallpapers are visible ONLY if user is explicitly granted access by the Web Admin!
+                val isVisible = (status == "published") || isExplicitlyAllowed
+                if (!isVisible) {
                     continue
                 }
 

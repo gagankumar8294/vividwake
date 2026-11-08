@@ -1,45 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="wrap_content"
+    android:layout_width="320dp"
     android:layout_height="wrap_content"
     android:layout_gravity="center"
-    app:cardBackgroundColor="#171326"
-    app:cardCornerRadius="20dp"
-    app:cardElevation="12dp"
-    app:strokeColor="#3D3254"
+    app:cardBackgroundColor="#130F26"
+    app:cardCornerRadius="24dp"
+    app:cardElevation="16dp"
+    app:strokeColor="#4A3772"
     app:strokeWidth="1.5dp">
 
     <LinearLayout
-        android:layout_width="260dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="vertical"
-        android:padding="28dp">
+        android:paddingStart="28dp"
+        android:paddingTop="32dp"
+        android:paddingEnd="28dp"
+        android:paddingBottom="32dp">
 
-        <ProgressBar
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:indeterminateTint="#9D4EDD" />
+        <!-- Layered Google Brand Spinner (Orbital Ring around Official Google 'G') -->
+        <FrameLayout
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center">
 
+            <!-- Indeterminate Ring Accent -->
+            <ProgressBar
+                android:layout_width="76dp"
+                android:layout_height="76dp"
+                android:indeterminateTint="#D4AF37" />
+
+            <!-- Inner Dark Circle Housing the Google Logo -->
+            <FrameLayout
+                android:layout_width="54dp"
+                android:layout_height="54dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_glass_toast"
+                android:backgroundTint="#1F1838">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="Google"
+                    android:src="@drawable/ic_google" />
+            </FrameLayout>
+        </FrameLayout>
+
+        <!-- Main Loading Title (Centered, Pure White, Modern Medium Sans) -->
         <TextView
             android:id="@+id/tvLoadingMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="20dp"
             android:fontFamily="sans-serif-medium"
+            android:gravity="center"
             android:text="Connecting to Google..."
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
 
+        <!-- Subtitle Note (Centered, Soft Lavender, Clean Sans) -->
         <TextView
+            android:id="@+id/tvLoadingSubtitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Verifying account credentials"
-            android:textColor="#A098B8"
-            android:textSize="12sp" />
+            android:layout_marginTop="8dp"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="Opening secure account authentication..."
+            android:textColor="#B0A8C0"
+            android:textSize="13sp" />
 
     </LinearLayout>
 

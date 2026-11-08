@@ -17,4 +17,12 @@
     <style name="ShapeAppearance.Circle" parent="">
         <item name="cornerSize">50%</item>
     </style>
+
+    <style name="Theme.VideoLockScreen.BottomSheetDialog" parent="Theme.Design.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/CustomBottomSheetStyle</item>
+    </style>
+
+    <style name="CustomBottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
 </resources>

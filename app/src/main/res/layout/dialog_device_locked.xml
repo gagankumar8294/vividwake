@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="20dp">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="16dp"
+        app:cardBackgroundColor="#130F26"
+        app:strokeWidth="1.5dp"
+        app:strokeColor="#4A3772">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:paddingTop="26dp"
+            android:paddingBottom="24dp">
+
+            <!-- 🔒 Glowing Lock Icon Badge -->
+            <FrameLayout
+                android:layout_width="68dp"
+                android:layout_height="68dp"
+                android:background="@drawable/bg_lock_circle_badge">
+
+                <ImageView
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_lock"
+                    android:contentDescription="Device Lock Icon" />
+            </FrameLayout>
+
+            <!-- Headline -->
+            <TextView
+                android:id="@+id/tvDeviceLockTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Device Locked to Account"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center" />
+
+            <!-- Policy Explanation -->
+            <TextView
+                android:id="@+id/tvDeviceLockDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Under our 1-Phone = 1-Account security policy, this device is registered to the authorized account below:"
+                android:textColor="#B0A8C0"
+                android:textSize="13sp"
+                android:lineSpacingExtra="3dp"
+                android:gravity="center" />
+
+            <!-- 🔑 Highlighted Email Container -->
+            <LinearLayout
+                android:id="@+id/layoutEmailHighlight"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_email_highlight_card"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_lock"
+                    android:contentDescription="Authorized Account" />
+
+                <TextView
+                    android:id="@+id/tvAuthorizedEmail"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:text="user@gmail.com"
+                    android:textColor="#FFD700"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium"
+                    android:textIsSelectable="true" />
+            </LinearLayout>
+
+            <!-- Clear Action Guidance -->
+            <TextView
+                android:id="@+id/tvDeviceLockHint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Please use this Google account to log in on this device."
+                android:textColor="#DDD6FE"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <!-- Primary Action: Sign In With This Account -->
+            <Button
+                android:id="@+id/btnSignInWithAuthorized"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:backgroundTint="#D4AF37"
+                android:text="Sign In with This Account"
+                android:textColor="#120E1F"
+                android:textSize="13.5sp"
+                android:textStyle="bold"
+                app:cornerRadius="24dp" />
+
+            <!-- Secondary Action: Dismiss -->
+            <Button
+                android:id="@+id/btnCloseDeviceLock"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:background="@android:color/transparent"
+                android:text="Dismiss"
+                android:textColor="#A89FC0"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+</FrameLayout>

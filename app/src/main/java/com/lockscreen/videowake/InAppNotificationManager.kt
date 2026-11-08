@@ -10,6 +10,7 @@ data class InAppNotification(
     val title: String,
     val message: String,
     val wallpaperId: String? = null,
+    val imageUrl: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     var isRead: Boolean = false
 )
@@ -24,13 +25,14 @@ class InAppNotificationManager(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun addNotification(title: String, message: String, wallpaperId: String? = null): InAppNotification {
+    fun addNotification(title: String, message: String, wallpaperId: String? = null, imageUrl: String? = null): InAppNotification {
         val list = getNotifications().toMutableList()
         val item = InAppNotification(
             id = "notif_${System.currentTimeMillis()}_${(100..999).random()}",
             title = title,
             message = message,
             wallpaperId = wallpaperId,
+            imageUrl = imageUrl,
             timestamp = System.currentTimeMillis(),
             isRead = false
         )
@@ -57,6 +59,7 @@ class InAppNotificationManager(private val context: Context) {
                         title = obj.optString("title"),
                         message = obj.optString("message"),
                         wallpaperId = if (obj.has("wallpaperId")) obj.optString("wallpaperId") else null,
+                        imageUrl = if (obj.has("imageUrl")) obj.optString("imageUrl") else null,
                         timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
                         isRead = obj.optBoolean("isRead", false)
                     )
@@ -88,6 +91,7 @@ class InAppNotificationManager(private val context: Context) {
                 put("title", item.title)
                 put("message", item.message)
                 put("wallpaperId", item.wallpaperId)
+                put("imageUrl", item.imageUrl)
                 put("timestamp", item.timestamp)
                 put("isRead", item.isRead)
             }
