@@ -197,9 +197,10 @@ class StoreWallpaperAdapter(
         private val tvTitle: TextView = itemView.findViewById(R.id.tvStoreTitle)
         private val tvDescription: TextView = itemView.findViewById(R.id.tvStoreDescription)
         private val tvSize: TextView = itemView.findViewById(R.id.tvStoreSize)
-        private val tvFeaturedBadge: TextView = itemView.findViewById(R.id.tvStoreFeaturedBadge)
-        private val tvDownloadedBadge: TextView = itemView.findViewById(R.id.tvStoreDownloadedBadge)
-        private val tvGiftedBadge: TextView? = itemView.findViewById(R.id.tvStoreGiftedBadge)
+        private val ivFeaturedBadge: View = itemView.findViewById(R.id.tvStoreFeaturedBadge)
+        private val ivDownloadedBadge: View = itemView.findViewById(R.id.tvStoreDownloadedBadge)
+        private val ivGiftedBadge: View? = itemView.findViewById(R.id.tvStoreGiftedBadge)
+        private val tvGiftedTextBadge: View? = itemView.findViewById(R.id.tvStoreGiftedTextBadge)
         private val pbDownload: ProgressBar = itemView.findViewById(R.id.pbStoreDownload)
         private val tvProgress: TextView = itemView.findViewById(R.id.tvStoreProgressText)
         private val btnDownload: MaterialButton = itemView.findViewById(R.id.btnStoreDownload)
@@ -221,9 +222,10 @@ class StoreWallpaperAdapter(
             tvSize.text = item.sizeDisplay.ifBlank { "Cloud Video" }
 
             // Badges
-            tvFeaturedBadge.visibility = if (item.isFeatured) View.VISIBLE else View.GONE
-            tvDownloadedBadge.visibility = if (item.isDownloaded) View.VISIBLE else View.GONE
-            tvGiftedBadge?.visibility = if (item.isGifted) View.VISIBLE else View.GONE
+            ivFeaturedBadge.visibility = if (item.isFeatured) View.VISIBLE else View.GONE
+            ivDownloadedBadge.visibility = if (item.isDownloaded) View.VISIBLE else View.GONE
+            ivGiftedBadge?.visibility = if (item.isGifted) View.VISIBLE else View.GONE
+            tvGiftedTextBadge?.visibility = if (item.isGifted) View.VISIBLE else View.GONE
 
             val currentProgress = downloadingProgressMap[item.id]
             val isDownloading = currentProgress != null
