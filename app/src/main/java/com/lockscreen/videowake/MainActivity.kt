@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Matrix
@@ -1042,14 +1043,57 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
             val duration = System.currentTimeMillis() - start
             result.onSuccess { downloadedFile ->
+                val thumbFile = File(repository.downloadManager.cloudThumbsDir, "thumb_${item.id}.jpg")
+                if (!thumbFile.exists() || thumbFile.length() == 0L) {
+                    try {
+                        if (item.thumbUrl.isNotBlank()) {
+                            val client = OkHttpClient()
+                            val req = Request.Builder().url(item.thumbUrl).build()
+                            client.newCall(req).execute().use { resp ->
+                                if (resp.isSuccessful) {
+                                    val b = resp.body?.bytes()
+                                    if (b != null && b.isNotEmpty()) {
+                                        thumbFile.parentFile?.mkdirs()
+                                        thumbFile.writeBytes(b)
+                                    }
+                                }
+                            }
+                        }
+                    } catch (_: Exception) {}
+
+                    if (!thumbFile.exists() || thumbFile.length() == 0L) {
+                        try {
+                            val mds = VaultSecurityManager.createMediaDataSource(downloadedFile)
+                            val retriever = MediaMetadataRetriever()
+                            try {
+                                retriever.setDataSource(mds)
+                                val bmp = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                    ?: retriever.frameAtTime
+                                if (bmp != null) {
+                                    thumbFile.parentFile?.mkdirs()
+                                    FileOutputStream(thumbFile).use { out ->
+                                        bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                                    }
+                                }
+                            } finally {
+                                try { retriever.release() } catch (_: Exception) {}
+                                try { mds.close() } catch (_: Exception) {}
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
+                val finalThumbPath = if (thumbFile.exists() && thumbFile.length() > 0) thumbFile.absolutePath else item.thumbPath
                 val updated = item.copy(
                     filePath = downloadedFile.absolutePath,
+                    thumbPath = finalThumbPath,
                     isDownloaded = true
                 )
                 fullCatalogList = fullCatalogList.map { if (it.id == updated.id) updated else it }
                 filteredCatalogList = filteredCatalogList.map { if (it.id == updated.id) updated else it }
                 storeAdapter.finishDownload(updated)
                 refreshGallery()
+                selectWallpaper(updated)
                 // Silent download - no toast alert as requested
                 analytics.logAction("download_success", "SUCCESS", duration, mapOf(
                     "id" to item.id,
@@ -1979,19 +2023,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     val file = File(item.filePath)
                     if (file.exists() && file.length() > 0) {
                         if (VaultSecurityManager.isScrambled(file)) {
-                            val mds = VaultSecurityManager.createMediaDataSource(file)
-                            setDataSource(mds)
+                            val retrieverMds = VaultSecurityManager.createMediaDataSource(file)
                             val retriever = MediaMetadataRetriever()
                             try {
-                                retriever.setDataSource(mds)
+                                retriever.setDataSource(retrieverMds)
                                 rotation = retriever.extractMetadata(
                                     MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
                                 )?.toIntOrNull() ?: 0
                             } catch (_: Exception) {} finally {
                                 try { retriever.release() } catch (_: Exception) {}
+                                try { retrieverMds.close() } catch (_: Exception) {}
                             }
+
+                            val playerMds = VaultSecurityManager.createMediaDataSource(file)
+                            setDataSource(playerMds)
                         } else {
-                            setDataSource(file.absolutePath)
                             val retriever = MediaMetadataRetriever()
                             try {
                                 retriever.setDataSource(file.absolutePath)
@@ -2001,6 +2047,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             } catch (_: Exception) {} finally {
                                 try { retriever.release() } catch (_: Exception) {}
                             }
+                            setDataSource(file.absolutePath)
                         }
                     } else {
                         val afd = resources.openRawResourceFd(R.raw.lock_wake_video)
@@ -2222,15 +2269,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun stopPreviewPlayback() {
+        val player = previewPlayer ?: return
+        previewPlayer = null
         try {
-            previewPlayer?.let {
-                if (it.isPlaying) it.stop()
-                it.release()
-            }
+            player.setOnPreparedListener(null)
+            player.setOnVideoSizeChangedListener(null)
+            player.setOnErrorListener(null)
+            player.reset()
+            player.release()
         } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            previewPlayer = null
+            Log.w("MainActivity", "Error stopping preview playback", e)
         }
     }
 

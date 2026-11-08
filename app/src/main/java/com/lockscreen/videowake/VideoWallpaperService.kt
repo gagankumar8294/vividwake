@@ -499,19 +499,21 @@ class VideoWallpaperService : WallpaperService() {
                         if (leaseValid && file.exists() && file.length() > 0) {
                             try {
                                 if (VaultSecurityManager.isScrambled(file)) {
-                                    val mds = VaultSecurityManager.createMediaDataSource(file)
-                                    setDataSource(mds)
-                                    dataSourceLoaded = true
-
+                                    val retrieverMds = VaultSecurityManager.createMediaDataSource(file)
                                     val retriever = MediaMetadataRetriever()
                                     try {
-                                        retriever.setDataSource(mds)
+                                        retriever.setDataSource(retrieverMds)
                                         videoRotation = retriever.extractMetadata(
                                             MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
                                         )?.toIntOrNull() ?: 0
                                     } catch (_: Exception) {} finally {
                                         try { retriever.release() } catch (_: Exception) {}
+                                        try { retrieverMds.close() } catch (_: Exception) {}
                                     }
+
+                                    val playerMds = VaultSecurityManager.createMediaDataSource(file)
+                                    setDataSource(playerMds)
+                                    dataSourceLoaded = true
                                 } else {
                                     setDataSource(file.absolutePath)
                                     dataSourceLoaded = true

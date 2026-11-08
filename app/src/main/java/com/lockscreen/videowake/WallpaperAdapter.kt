@@ -19,6 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 
@@ -142,8 +144,11 @@ class WallpaperAdapter(
                 if (bitmap != null) {
                     ivThumbnail.setImageBitmap(bitmap)
                 } else {
-                    // Fallback to built-in drawable if available
-                    ivThumbnail.setImageResource(R.drawable.wallpaper_thumb)
+                    if (item.isPreset) {
+                        ivThumbnail.setImageResource(R.drawable.wallpaper_thumb)
+                    } else {
+                        ivThumbnail.setImageResource(R.drawable.bg_skeleton_thumb)
+                    }
                 }
             }
         }
@@ -160,14 +165,17 @@ class WallpaperAdapter(
     }
 
     private suspend fun getOrGenerateThumbnail(item: WallpaperItem): Bitmap? = withContext(Dispatchers.IO) {
-        // 1. Check in-memory cache
+        val cleanId = item.cloudId.ifBlank { item.id.removePrefix("cloud_") }
         val cacheKey = item.id
+
+        // 1. Check in-memory cache
         memoryCache.get(cacheKey)?.let { return@withContext it }
+        memoryCache.get(cleanId)?.let { return@withContext it }
 
         // 2. Check disk thumbnail for custom wallpaper
         if (item.thumbPath.isNotEmpty()) {
             val thumbFile = File(item.thumbPath)
-            if (thumbFile.exists()) {
+            if (thumbFile.exists() && thumbFile.length() > 0) {
                 val bmp = BitmapFactory.decodeFile(thumbFile.absolutePath)
                 if (bmp != null) {
                     memoryCache.put(cacheKey, bmp)
@@ -176,7 +184,42 @@ class WallpaperAdapter(
             }
         }
 
-        // 3. Built-in presets
+        // 3. Check cloud thumbs directory
+        val cloudThumbsDir = File(context.filesDir, CloudConfig.FOLDER_CLOUD_THUMBS)
+        val cloudThumbFile = File(cloudThumbsDir, "thumb_${cleanId}.jpg")
+        if (cloudThumbFile.exists() && cloudThumbFile.length() > 0) {
+            val bmp = BitmapFactory.decodeFile(cloudThumbFile.absolutePath)
+            if (bmp != null) {
+                memoryCache.put(cacheKey, bmp)
+                return@withContext bmp
+            }
+        }
+
+        // 4. If remote thumbUrl is available, fetch and cache it
+        if (item.thumbUrl.isNotBlank()) {
+            try {
+                val client = OkHttpClient()
+                val req = Request.Builder().url(item.thumbUrl).build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val bytes = resp.body?.bytes()
+                        if (bytes != null && bytes.isNotEmpty()) {
+                            try {
+                                cloudThumbFile.parentFile?.mkdirs()
+                                cloudThumbFile.writeBytes(bytes)
+                            } catch (_: Exception) {}
+                            val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            if (bmp != null) {
+                                memoryCache.put(cacheKey, bmp)
+                                return@withContext bmp
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 5. Built-in presets
         if (item.isPreset) {
             if (item.rawResName == "lock_wake_video") {
                 val bmp = BitmapFactory.decodeResource(context.resources, R.drawable.wallpaper_thumb)
@@ -186,7 +229,6 @@ class WallpaperAdapter(
                 }
             }
 
-            // Extract from raw resource
             try {
                 val retriever = MediaMetadataRetriever()
                 val afd = context.resources.openRawResourceFd(item.rawResId)
@@ -201,18 +243,43 @@ class WallpaperAdapter(
                 }
             } catch (_: Exception) {}
         } else if (item.filePath.isNotEmpty()) {
-            // Generate and save thumbnail on the fly if missing
-            try {
-                val retriever = MediaMetadataRetriever()
-                retriever.setDataSource(item.filePath)
-                val bmp = retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    ?: retriever.frameAtTime
-                retriever.release()
-                if (bmp != null) {
-                    memoryCache.put(cacheKey, bmp)
-                    return@withContext bmp
-                }
-            } catch (_: Exception) {}
+            // 6. Extract frame from local/cloud video (supporting scrambled vault files!)
+            val file = File(item.filePath)
+            if (file.exists() && file.length() > 0) {
+                try {
+                    val retriever = MediaMetadataRetriever()
+                    val bmp = if (VaultSecurityManager.isScrambled(file)) {
+                        val mds = VaultSecurityManager.createMediaDataSource(file)
+                        try {
+                            retriever.setDataSource(mds)
+                            retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                ?: retriever.frameAtTime
+                        } finally {
+                            try { retriever.release() } catch (_: Exception) {}
+                            try { mds.close() } catch (_: Exception) {}
+                        }
+                    } else {
+                        try {
+                            retriever.setDataSource(file.absolutePath)
+                            retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                ?: retriever.frameAtTime
+                        } finally {
+                            try { retriever.release() } catch (_: Exception) {}
+                        }
+                    }
+
+                    if (bmp != null) {
+                        try {
+                            cloudThumbFile.parentFile?.mkdirs()
+                            FileOutputStream(cloudThumbFile).use { out ->
+                                bmp.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                            }
+                        } catch (_: Exception) {}
+                        memoryCache.put(cacheKey, bmp)
+                        return@withContext bmp
+                    }
+                } catch (_: Exception) {}
+            }
         }
 
         return@withContext null

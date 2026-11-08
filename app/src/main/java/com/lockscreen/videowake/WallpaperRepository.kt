@@ -85,15 +85,45 @@ class WallpaperRepository(private val context: Context) {
             val cloudDir = downloadManager.cloudWallpapersDir
             val files = cloudDir.listFiles { f -> f.extension.equals("mp4", ignoreCase = true) }
             if (files != null) {
+                val catalogMap = try {
+                    val rawJson = context.assets.open("wallpapers.json").bufferedReader().use { it.readText() }
+                    val arr = org.json.JSONArray(rawJson)
+                    val map = mutableMapOf<String, org.json.JSONObject>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        map[obj.optString("id")] = obj
+                    }
+                    map
+                } catch (_: Exception) {
+                    emptyMap()
+                }
+
                 for (f in files) {
                     val rawId = f.nameWithoutExtension.removePrefix("cloud_")
+                    val catObj = catalogMap[rawId]
+                    val title = catObj?.optString("title") ?: rawId.replace("_", " ").capitalizeWords().take(22)
+                    val thumbUrl = catObj?.optString("thumbUrl") ?: ""
+                    val category = catObj?.optString("category") ?: "Cloud"
+                    val desc = catObj?.optString("description") ?: ""
+                    val isFeatured = catObj?.optBoolean("isFeatured", false) ?: false
+                    val isVip = catObj?.optBoolean("isVipOnly", false) ?: false
+
+                    val thumbFile = File(downloadManager.cloudThumbsDir, "thumb_${rawId}.jpg")
+                    val thumbPath = if (thumbFile.exists() && thumbFile.length() > 0) thumbFile.absolutePath else ""
+
                     list.add(
                         WallpaperItem(
-                            id = "cloud_$rawId",
+                            id = rawId,
                             cloudId = rawId,
-                            title = rawId.replace("_", " ").capitalizeWords().take(22),
+                            title = title,
                             isPreset = false,
                             filePath = f.absolutePath,
+                            thumbPath = thumbPath,
+                            thumbUrl = thumbUrl,
+                            category = category,
+                            description = desc,
+                            isFeatured = isFeatured,
+                            isVipOnly = isVip,
                             isCloud = true,
                             isDownloaded = true
                         )
@@ -121,7 +151,8 @@ class WallpaperRepository(private val context: Context) {
         return all.find {
             it.id == activeId ||
             it.id == "cloud_$normalized" ||
-            (it.cloudId.isNotBlank() && it.cloudId == normalized) ||
+            it.id == normalized ||
+            (it.cloudId.isNotBlank() && (it.cloudId == normalized || it.cloudId == activeId)) ||
             it.id.removePrefix("cloud_") == normalized
         } ?: all.first()
     }
