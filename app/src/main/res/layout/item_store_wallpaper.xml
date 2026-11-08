@@ -62,12 +62,13 @@
                         android:alpha="0.5" />
                 </FrameLayout>
 
-                <!-- Featured Badge: Centered on thumbnail image -->
+                <!-- Featured Badge: Top Center -->
                 <TextView
                     android:id="@+id/tvStoreFeaturedBadge"
                     android:layout_width="wrap_content"
                     android:layout_height="16dp"
-                    android:layout_gravity="center"
+                    android:layout_gravity="top|center_horizontal"
+                    android:layout_marginTop="4dp"
                     android:background="@drawable/bg_featured_badge_mini"
                     android:paddingHorizontal="6dp"
                     android:paddingVertical="0dp"
