@@ -2,8 +2,15 @@ package com.lockscreen.videowake
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
+import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 data class InAppNotification(
     val id: String,
@@ -47,7 +54,29 @@ class InAppNotificationManager(private val context: Context) {
     }
 
     fun getNotifications(): List<InAppNotification> {
-        val jsonStr = prefs.getString(KEY_NOTIFICATIONS, null) ?: return emptyList()
+        val jsonStr = prefs.getString(KEY_NOTIFICATIONS, null)
+        if (jsonStr == null) {
+            val initial = listOf(
+                InAppNotification(
+                    id = "welcome_01",
+                    title = "Welcome to VividWake",
+                    message = "Set stunning cinematic video wallpapers on your lock screen. Explore top live picks in Explore Store!",
+                    wallpaperId = "wp_game_character_01",
+                    timestamp = System.currentTimeMillis() - 3600000,
+                    isRead = false
+                ),
+                InAppNotification(
+                    id = "featured_drop_01",
+                    title = "Cyberpunk 2077 Live Wallpaper Dropped",
+                    message = "Exclusive live video wallpaper is now available in Explore Store.",
+                    wallpaperId = "cyberpunk_neon_city_4k",
+                    timestamp = System.currentTimeMillis() - 7200000,
+                    isRead = false
+                )
+            )
+            saveNotifications(initial)
+            return initial
+        }
         val list = mutableListOf<InAppNotification>()
         try {
             val arr = JSONArray(jsonStr)
@@ -81,6 +110,96 @@ class InAppNotificationManager(private val context: Context) {
 
     fun clearAll() {
         prefs.edit().remove(KEY_NOTIFICATIONS).apply()
+    }
+
+    suspend fun syncWithServer(
+        userEmail: String?,
+        userId: String?,
+        showSystemAlertOnNew: Boolean = true
+    ): Int = withContext(Dispatchers.IO) {
+        val client = OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+
+        val query = if (!userEmail.isNullOrBlank()) "?userEmail=${Uri.encode(userEmail)}" else ""
+        val urls = listOf(
+            "${CloudConfig.ANALYTICS_BASE_URL}/api/notifications/sync$query",
+            "http://127.0.0.1:5000/api/notifications/sync$query"
+        )
+
+        var fetchedList: List<InAppNotification>? = null
+        for (url in urls) {
+            try {
+                val req = Request.Builder()
+                    .url(url)
+                    .header("Cache-Control", "no-cache")
+                    .build()
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string()
+                        if (!body.isNullOrBlank()) {
+                            val json = JSONObject(body)
+                            if (json.optBoolean("success", false)) {
+                                val arr = json.optJSONArray("notifications") ?: JSONArray()
+                                val parsed = mutableListOf<InAppNotification>()
+                                for (i in 0 until arr.length()) {
+                                    val obj = arr.getJSONObject(i)
+                                    parsed.add(
+                                        InAppNotification(
+                                            id = obj.optString("id"),
+                                            title = obj.optString("title"),
+                                            message = obj.optString("body"),
+                                            wallpaperId = if (obj.has("wallpaperId")) obj.optString("wallpaperId") else null,
+                                            imageUrl = if (obj.has("imageUrl")) obj.optString("imageUrl") else null,
+                                            timestamp = obj.optLong("sentAt", System.currentTimeMillis()),
+                                            isRead = false
+                                        )
+                                    )
+                                }
+                                fetchedList = parsed
+                                return@use
+                            }
+                        }
+                    }
+                }
+                if (fetchedList != null) break
+            } catch (e: Exception) {
+                Log.d("InAppNotifMgr", "Sync failed from $url (${e.message})")
+            }
+        }
+
+        if (fetchedList == null) return@withContext 0
+
+        val currentLocal = getNotifications().toMutableList()
+        val existingIds = currentLocal.map { it.id }.toSet()
+        var newCount = 0
+
+        for (cloudNotif in fetchedList!!) {
+            if (!existingIds.contains(cloudNotif.id)) {
+                currentLocal.add(0, cloudNotif)
+                newCount++
+                if (showSystemAlertOnNew) {
+                    try {
+                        AppFirebaseMessagingService.showSystemNotification(
+                            context,
+                            cloudNotif.title,
+                            cloudNotif.message,
+                            cloudNotif.wallpaperId,
+                            cloudNotif.imageUrl
+                        )
+                    } catch (e: Exception) {
+                        Log.w("InAppNotifMgr", "Could not show system notification alert: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        if (newCount > 0) {
+            saveNotifications(currentLocal.take(50))
+        }
+        newCount
     }
 
     private fun saveNotifications(list: List<InAppNotification>) {

@@ -27,6 +27,80 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
         const val CHANNEL_ID = "vividwake_wallpapers_channel"
         const val CHANNEL_NAME = "Live Wallpapers & Updates"
         const val ACTION_NEW_INAPP_NOTIFICATION = "com.lockscreen.videowake.NEW_INAPP_NOTIFICATION"
+
+        fun showSystemNotification(context: Context, title: String, body: String, wallpaperId: String?, imageUrl: String?) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Alerts when new live wallpapers or assignments arrive"
+                    enableLights(true)
+                    lightColor = Color.parseColor("#9D4EDD")
+                    enableVibration(true)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val intent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("open_tab", "store")
+                if (!wallpaperId.isNullOrBlank()) {
+                    putExtra("highlight_wallpaper_id", wallpaperId)
+                }
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                System.currentTimeMillis().toInt(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // Download matching notification banner bitmap if URL is provided
+            var bannerBitmap: Bitmap? = null
+            if (!imageUrl.isNullOrBlank()) {
+                try {
+                    val conn = URL(imageUrl).openConnection() as HttpURLConnection
+                    conn.doInput = true
+                    conn.connectTimeout = 7000
+                    conn.readTimeout = 8000
+                    conn.connect()
+                    conn.inputStream.use { stream ->
+                        bannerBitmap = BitmapFactory.decodeStream(stream)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not download notification banner image: ${e.message}")
+                }
+            }
+
+            val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_sparkle)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setAutoCancel(true)
+                .setSound(defaultSoundUri)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+
+            if (bannerBitmap != null) {
+                notificationBuilder.setStyle(
+                    NotificationCompat.BigPictureStyle()
+                        .bigPicture(bannerBitmap)
+                        .setBigContentTitle(title)
+                        .setSummaryText(body)
+                )
+                notificationBuilder.setLargeIcon(bannerBitmap)
+            } else {
+                notificationBuilder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            }
+
+            notificationManager.notify((System.currentTimeMillis() % 100000).toInt(), notificationBuilder.build())
+        }
     }
 
     override fun onNewToken(token: String) {
@@ -65,81 +139,7 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
 
         // 2. If system or both, show Android Status Bar Notification with Matching Banner Image
         if (deliveryType == "system" || deliveryType == "both") {
-            showSystemNotification(title, body, wallpaperId, imageUrl)
+            showSystemNotification(applicationContext, title, body, wallpaperId, imageUrl)
         }
-    }
-
-    private fun showSystemNotification(title: String, body: String, wallpaperId: String?, imageUrl: String?) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Alerts when new live wallpapers or assignments arrive"
-                enableLights(true)
-                lightColor = Color.parseColor("#9D4EDD")
-                enableVibration(true)
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("open_tab", "store")
-            if (!wallpaperId.isNullOrBlank()) {
-                putExtra("highlight_wallpaper_id", wallpaperId)
-            }
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            System.currentTimeMillis().toInt(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Download matching notification banner bitmap if URL is provided
-        var bannerBitmap: Bitmap? = null
-        if (!imageUrl.isNullOrBlank()) {
-            try {
-                val conn = URL(imageUrl).openConnection() as HttpURLConnection
-                conn.doInput = true
-                conn.connectTimeout = 7000
-                conn.readTimeout = 8000
-                conn.connect()
-                conn.inputStream.use { stream ->
-                    bannerBitmap = BitmapFactory.decodeStream(stream)
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not download notification banner image: ${e.message}")
-            }
-        }
-
-        val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_sparkle)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setAutoCancel(true)
-            .setSound(defaultSoundUri)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setContentIntent(pendingIntent)
-
-        if (bannerBitmap != null) {
-            notificationBuilder.setStyle(
-                NotificationCompat.BigPictureStyle()
-                    .bigPicture(bannerBitmap)
-                    .setBigContentTitle(title)
-                    .setSummaryText(body)
-            )
-            notificationBuilder.setLargeIcon(bannerBitmap)
-        } else {
-            notificationBuilder.setStyle(NotificationCompat.BigTextStyle().bigText(body))
-        }
-
-        notificationManager.notify(System.currentTimeMillis().toInt(), notificationBuilder.build())
     }
 }

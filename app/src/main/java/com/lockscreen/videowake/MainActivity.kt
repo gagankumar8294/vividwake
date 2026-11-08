@@ -1,5 +1,6 @@
 package com.lockscreen.videowake
 
+import android.Manifest
 import android.app.Activity
 import android.app.WallpaperManager
 import android.content.BroadcastReceiver
@@ -8,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -52,13 +54,17 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -228,6 +234,67 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setPositiveButton("OK", null)
                 .show()
         } catch (_: Exception) {}
+    }
+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d("MainActivity", "POST_NOTIFICATIONS permission granted")
+            syncInAppNotifications()
+        }
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private fun syncInAppNotifications() {
+        val user = authManager.currentUser
+        lifecycleScope.launch {
+            try {
+                val newCount = inAppNotificationManager.syncWithServer(
+                    userEmail = user?.email,
+                    userId = user?.uid,
+                    showSystemAlertOnNew = true
+                )
+                withContext(Dispatchers.Main) {
+                    updateNotificationBadge()
+                }
+            } catch (e: Exception) {
+                Log.d("MainActivity", "Notification sync error: ${e.message}")
+            }
+        }
+    }
+
+    private fun registerPushTokenWithBackend() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful && !task.result.isNullOrBlank()) {
+                val token = task.result
+                val user = authManager.currentUser
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val payload = JSONObject().apply {
+                            put("fcmToken", token)
+                            put("userEmail", user?.email ?: "")
+                            put("userId", user?.uid ?: "")
+                            put("deviceModel", "${Build.MANUFACTURER} ${Build.MODEL}")
+                        }
+                        val client = OkHttpClient()
+                        val mediaType = "application/json; charset=utf-8".toMediaType()
+                        val req = Request.Builder()
+                            .url("${CloudConfig.ANALYTICS_BASE_URL}/api/notifications/register-token")
+                            .post(payload.toString().toRequestBody(mediaType))
+                            .build()
+                        client.newCall(req).execute().close()
+                    } catch (_: Exception) {}
+                }
+            }
+        }
     }
 
     private val googleSignInLauncher = registerForActivityResult(
@@ -447,6 +514,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         setupTabSwitching()
         setupListeners()
         setupHeaderControls()
+
+        checkNotificationPermission()
+        syncInAppNotifications()
+        registerPushTokenWithBackend()
 
         // Check if opened from notification
         if (intent?.getStringExtra("open_tab") == "store") {
@@ -1220,6 +1291,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 prefs.edit().putStringSet("assigned_wallpaper_ids", assignedList.toSet()).apply()
                 runOnUiThread {
                     loadStoreCatalog()
+                    syncInAppNotifications()
                 }
             }
         } else {
@@ -1254,27 +1326,49 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyNotifs)
         val btnClear = view.findViewById<TextView>(R.id.btnClearAllNotifs)
 
-        val list = inAppNotificationManager.getNotifications()
-        if (list.isEmpty()) {
-            tvEmpty.visibility = View.VISIBLE
-            rv.visibility = View.GONE
-        } else {
-            tvEmpty.visibility = View.GONE
-            rv.visibility = View.VISIBLE
-            rv.layoutManager = LinearLayoutManager(this)
-            val notifAdapter = InAppNotificationAdapter(list) { notif ->
-                val clickStart = System.currentTimeMillis()
-                analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
-                    "notifId" to notif.id,
-                    "title" to notif.title,
-                    "wallpaperId" to (notif.wallpaperId ?: "")
-                ))
-                dialog.dismiss()
-                if (!notif.wallpaperId.isNullOrBlank()) {
-                    switchToStoreTab()
+        fun renderList() {
+            val list = inAppNotificationManager.getNotifications()
+            if (list.isEmpty()) {
+                tvEmpty.visibility = View.VISIBLE
+                rv.visibility = View.GONE
+            } else {
+                tvEmpty.visibility = View.GONE
+                rv.visibility = View.VISIBLE
+                rv.layoutManager = LinearLayoutManager(this)
+                val notifAdapter = InAppNotificationAdapter(list) { notif ->
+                    val clickStart = System.currentTimeMillis()
+                    analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
+                        "notifId" to notif.id,
+                        "title" to notif.title,
+                        "wallpaperId" to (notif.wallpaperId ?: "")
+                    ))
+                    dialog.dismiss()
+                    if (!notif.wallpaperId.isNullOrBlank()) {
+                        switchToStoreTab()
+                    }
                 }
+                rv.adapter = notifAdapter
             }
-            rv.adapter = notifAdapter
+        }
+
+        renderList()
+
+        // Background sync to ensure freshest notifications from server
+        val user = authManager.currentUser
+        lifecycleScope.launch {
+            try {
+                val newCount = inAppNotificationManager.syncWithServer(
+                    userEmail = user?.email,
+                    userId = user?.uid,
+                    showSystemAlertOnNew = false
+                )
+                if (newCount > 0 && dialog.isShowing) {
+                    withContext(Dispatchers.Main) {
+                        renderList()
+                        updateNotificationBadge()
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
         btnClear.setOnClickListener {
@@ -2194,6 +2288,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     override fun onResume() {
         super.onResume()
         updateNotificationBadge()
+        syncInAppNotifications()
         updateUserAuthUI()
         checkVersionGate()
 
