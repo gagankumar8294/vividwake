@@ -92,23 +92,23 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     // Store Section
     private lateinit var rvStoreWallpapers: RecyclerView
     private lateinit var layoutStoreSkeleton: View
-    private lateinit var btnRefreshStore: MaterialButton
-    private lateinit var tvStoreCatalogHeader: TextView
     private lateinit var nestedScrollViewMain: androidx.core.widget.NestedScrollView
-    private lateinit var chipGroupStoreCategories: com.google.android.material.chip.ChipGroup
     private lateinit var pbStoreLoadMore: ProgressBar
 
-    // Enhanced Store Search, Sub-Categories & Quick Discovery
+    // Concept 1: Command Bar, Search & 🎁 Gifted Filter
     private lateinit var etStoreSearch: EditText
     private lateinit var btnClearStoreSearch: ImageButton
-    private lateinit var btnBrowseCategories: MaterialButton
+    private lateinit var btnFilterGifted: MaterialButton
+    private lateinit var btnStoreFilterCategories: View
     private lateinit var layoutActiveFilterBanner: LinearLayout
     private lateinit var tvActiveFilterText: TextView
     private lateinit var btnResetActiveFilter: MaterialButton
-    private lateinit var chipGroupStoreSubTags: com.google.android.material.chip.ChipGroup
     private lateinit var layoutStoreEmptyState: LinearLayout
+    private lateinit var tvStoreEmptyTitle: TextView
     private lateinit var tvStoreEmptySubtitle: TextView
     private lateinit var btnResetStoreFilters: MaterialButton
+
+    private var isGiftedFilterActive: Boolean = false
 
     // Explore Store Pagination & Filter State
     private var fullCatalogList: List<WallpaperItem> = emptyList()
@@ -405,20 +405,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         rvStoreWallpapers = findViewById(R.id.rvStoreWallpapers)
         layoutStoreSkeleton = findViewById(R.id.layoutStoreSkeleton)
-        btnRefreshStore = findViewById(R.id.btnRefreshStore)
-        tvStoreCatalogHeader = findViewById(R.id.tvStoreCatalogHeader)
         nestedScrollViewMain = findViewById(R.id.nestedScrollViewMain)
-        chipGroupStoreCategories = findViewById(R.id.chipGroupStoreCategories)
         pbStoreLoadMore = findViewById(R.id.pbStoreLoadMore)
 
         etStoreSearch = findViewById(R.id.etStoreSearch)
         btnClearStoreSearch = findViewById(R.id.btnClearStoreSearch)
-        btnBrowseCategories = findViewById(R.id.btnBrowseCategories)
+        btnFilterGifted = findViewById(R.id.btnFilterGifted)
+        btnStoreFilterCategories = findViewById(R.id.btnStoreFilterCategories)
         layoutActiveFilterBanner = findViewById(R.id.layoutActiveFilterBanner)
         tvActiveFilterText = findViewById(R.id.tvActiveFilterText)
         btnResetActiveFilter = findViewById(R.id.btnResetActiveFilter)
-        chipGroupStoreSubTags = findViewById(R.id.chipGroupStoreSubTags)
         layoutStoreEmptyState = findViewById(R.id.layoutStoreEmptyState)
+        tvStoreEmptyTitle = findViewById(R.id.tvStoreEmptyTitle)
         tvStoreEmptySubtitle = findViewById(R.id.tvStoreEmptySubtitle)
         btnResetStoreFilters = findViewById(R.id.btnResetStoreFilters)
 
@@ -559,16 +557,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnTabExploreStore.setOnClickListener {
             switchToStoreTab()
         }
-
-        btnRefreshStore.setOnClickListener {
-            val start = System.currentTimeMillis()
-            try {
-                loadStoreCatalog()
-                analytics.logAction("refresh_store_click", "SUCCESS", System.currentTimeMillis() - start, emptyMap())
-            } catch (e: Exception) {
-                analytics.logAction("refresh_store_click", "FAILED", System.currentTimeMillis() - start, emptyMap(), e)
-            }
-        }
     }
 
     private fun switchToMyWallpapersTab() {
@@ -696,14 +684,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 layoutStoreSkeleton.visibility = View.GONE
                 rvStoreWallpapers.visibility = View.VISIBLE
 
-                setupStoreCategoryChips()
+                updateGiftedFilterButtonUI()
                 applyCategoryFilter(currentStoreCategory)
 
-                if (fullCatalogList.isEmpty()) {
-                    tvStoreCatalogHeader.text = "No wallpapers available yet. Check back soon!"
-                } else {
-                    tvStoreCatalogHeader.text = "Tap card to stream preview. Download to set as wallpaper."
-                }
                 val duration = System.currentTimeMillis() - start
                 analytics.logAction("store_catalog_fetch", "SUCCESS", duration, mapOf(
                     "count" to fullCatalogList.size
@@ -719,106 +702,22 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun setupStoreCategoryChips() {
-        chipGroupStoreCategories.removeAllViews()
-        val distinctCategories = fullCatalogList.map { it.category }.filter { it.isNotBlank() }.distinct()
-        val categories = listOf("All") + distinctCategories
-
-        for (cat in categories) {
-            val count = if (cat == "All") fullCatalogList.size else fullCatalogList.count { it.category.equals(cat, ignoreCase = true) }
-            val chip = com.google.android.material.chip.Chip(this).apply {
-                text = "$cat ($count)"
-                isCheckable = true
-                isChecked = (cat == currentStoreCategory)
-                chipBackgroundColor = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(Color.parseColor("#D4AF37"), Color.parseColor("#261E38"))
-                )
-                setTextColor(ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(Color.parseColor("#0E0B16"), Color.parseColor("#B0A8C0"))
-                ))
-                chipStrokeWidth = 1f
-                chipStrokeColor = ColorStateList.valueOf(Color.parseColor("#3A2F4C"))
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked && currentStoreCategory != cat) {
-                        applyCategoryFilter(cat)
-                    }
-                }
-                setOnClickListener {
-                    if (currentStoreCategory != cat) {
-                        applyCategoryFilter(cat)
-                    }
-                }
-            }
-            chipGroupStoreCategories.addView(chip)
-        }
-        setupStoreSubTags()
+        // Concept 1: Categories are accessed via the dedicated Filter Modal Button
     }
 
     private fun setupStoreSubTags() {
-        chipGroupStoreSubTags.removeAllViews()
-        val baseItems = if (currentStoreCategory == "All") {
-            fullCatalogList
-        } else {
-            fullCatalogList.filter { it.category.equals(currentStoreCategory, ignoreCase = true) }
-        }
-
-        val tagCounts = mutableMapOf<String, Int>()
-        val skipTags = setOf("wallpaper", "video", "animated", "lockscreen", "screen", "live", "4k", "hd", "loop")
-        baseItems.forEach { item ->
-            item.tags.forEach { t ->
-                val clean = t.trim().lowercase()
-                if (clean.length > 2 && clean !in skipTags) {
-                    tagCounts[clean] = (tagCounts[clean] ?: 0) + 1
-                }
-            }
-        }
-
-        val topTags = tagCounts.entries
-            .filter { it.value >= 1 }
-            .sortedByDescending { it.value }
-            .take(15)
-            .map { it.key }
-
-        val allLabel = if (currentStoreCategory == "All") "All Trending" else "All $currentStoreCategory"
-        val allChip = createSubTagChip("All", allLabel, isChecked = (currentStoreSubTag == "All" || currentStoreSubTag.isBlank()))
-        chipGroupStoreSubTags.addView(allChip)
-
-        for (tag in topTags) {
-            val count = tagCounts[tag] ?: 0
-            val formatted = formatTagName(tag)
-            val chip = createSubTagChip(tag, "$formatted ($count)", isChecked = (currentStoreSubTag.equals(tag, ignoreCase = true)))
-            chipGroupStoreSubTags.addView(chip)
-        }
+        // Concept 1: Cluttered horizontal scrollbars removed
     }
 
-    private fun createSubTagChip(tagKey: String, displayLabel: String, isChecked: Boolean): com.google.android.material.chip.Chip {
-        return com.google.android.material.chip.Chip(this).apply {
-            text = displayLabel
-            isCheckable = true
-            this.isChecked = isChecked
-            chipBackgroundColor = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(Color.parseColor("#FFD700"), Color.parseColor("#1B1428"))
-            )
-            setTextColor(ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(Color.parseColor("#0E0B16"), Color.parseColor("#8E879E"))
-            ))
-            chipStrokeWidth = 1f
-            chipStrokeColor = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(Color.parseColor("#FFD700"), Color.parseColor("#33D4AF37"))
-            )
-            setOnCheckedChangeListener { _, checked ->
-                if (checked) {
-                    applySubTagFilter(tagKey)
-                }
-            }
-            setOnClickListener {
-                applySubTagFilter(tagKey)
-            }
-        }
+    private fun applyCategoryFilter(category: String) {
+        currentStoreCategory = category
+        currentStoreSubTag = "All"
+        recomputeFilteredCatalog()
+    }
+
+    private fun applySubTagFilter(subTag: String) {
+        currentStoreSubTag = subTag
+        recomputeFilteredCatalog()
     }
 
     private fun formatTagName(tag: String): String {
@@ -832,21 +731,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             }
     }
 
-    private fun applyCategoryFilter(category: String) {
-        currentStoreCategory = category
-        currentStoreSubTag = "All"
-        setupStoreCategoryChips()
-        recomputeFilteredCatalog()
-    }
-
-    private fun applySubTagFilter(subTag: String) {
-        currentStoreSubTag = subTag
-        setupStoreSubTags()
-        recomputeFilteredCatalog()
-    }
-
     private fun recomputeFilteredCatalog() {
         var result = fullCatalogList
+
+        // 0. 🎁 Gifted Filter (Concept 1)
+        if (isGiftedFilterActive) {
+            result = result.filter { it.isGifted }
+        }
 
         // 1. Category filter
         if (currentStoreCategory != "All") {
@@ -886,7 +777,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         if (filteredCatalogList.isEmpty()) {
             rvStoreWallpapers.visibility = View.GONE
             layoutStoreEmptyState.visibility = View.VISIBLE
-            tvStoreEmptySubtitle.text = "No wallpapers found for '$currentStoreSearchQuery${if (currentStoreSubTag != "All") " / " + formatTagName(currentStoreSubTag) else ""}'."
+            if (isGiftedFilterActive) {
+                tvStoreEmptyTitle.text = "No Gifted Wallpapers Yet"
+                tvStoreEmptySubtitle.text = "Wallpapers specially assigned to you by the admin will appear here."
+            } else {
+                tvStoreEmptyTitle.text = "No wallpapers found"
+                tvStoreEmptySubtitle.text = "No wallpapers found for '$currentStoreSearchQuery'."
+            }
         } else {
             rvStoreWallpapers.visibility = View.VISIBLE
             layoutStoreEmptyState.visibility = View.GONE
@@ -895,18 +792,36 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         updateActiveFilterBanner()
     }
 
+    private fun updateGiftedFilterButtonUI() {
+        val giftedCount = fullCatalogList.count { it.isGifted }
+        val label = if (giftedCount > 0) "🎁 Gifted ($giftedCount)" else "🎁 Gifted"
+        btnFilterGifted.text = label
+
+        if (isGiftedFilterActive) {
+            btnFilterGifted.setBackgroundColor(Color.parseColor("#D4AF37"))
+            btnFilterGifted.setTextColor(Color.parseColor("#120E1F"))
+            btnFilterGifted.strokeColor = ColorStateList.valueOf(Color.parseColor("#D4AF37"))
+        } else {
+            btnFilterGifted.setBackgroundColor(Color.parseColor("#261E38"))
+            btnFilterGifted.setTextColor(Color.parseColor("#D4AF37"))
+            btnFilterGifted.strokeColor = ColorStateList.valueOf(Color.parseColor("#50D4AF37"))
+        }
+    }
+
     private fun updateActiveFilterBanner() {
+        val hasCategory = currentStoreCategory != "All"
         val hasSubTag = currentStoreSubTag.isNotBlank() && currentStoreSubTag != "All"
         val hasSearch = currentStoreSearchQuery.isNotBlank()
 
-        if (hasSubTag || hasSearch) {
+        if (isGiftedFilterActive || hasCategory || hasSubTag || hasSearch) {
             layoutActiveFilterBanner.visibility = View.VISIBLE
             val parts = mutableListOf<String>()
-            if (currentStoreCategory != "All") parts.add(currentStoreCategory)
+            if (isGiftedFilterActive) parts.add("🎁 Gifted Only")
+            if (hasCategory) parts.add(currentStoreCategory)
             if (hasSubTag) parts.add(formatTagName(currentStoreSubTag))
             if (hasSearch) parts.add("\"$currentStoreSearchQuery\"")
 
-            tvActiveFilterText.text = "Showing: ${parts.joinToString(" > ")} (${filteredCatalogList.size} wallpapers)"
+            tvActiveFilterText.text = "Showing: ${parts.joinToString(" • ")} (${filteredCatalogList.size} wallpapers)"
         } else {
             layoutActiveFilterBanner.visibility = View.GONE
         }
@@ -1618,24 +1533,33 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             recomputeFilteredCatalog()
         }
 
-        btnBrowseCategories.setOnClickListener {
+        btnFilterGifted.setOnClickListener {
+            isGiftedFilterActive = !isGiftedFilterActive
+            updateGiftedFilterButtonUI()
+            recomputeFilteredCatalog()
+        }
+
+        btnStoreFilterCategories.setOnClickListener {
             showCategoryBottomSheetDialog()
         }
 
         btnResetActiveFilter.setOnClickListener {
-            currentStoreSubTag = "All"
-            currentStoreSearchQuery = ""
-            etStoreSearch.text.clear()
-            setupStoreSubTags()
-            recomputeFilteredCatalog()
-        }
-
-        btnResetStoreFilters.setOnClickListener {
+            isGiftedFilterActive = false
             currentStoreCategory = "All"
             currentStoreSubTag = "All"
             currentStoreSearchQuery = ""
             etStoreSearch.text.clear()
-            setupStoreCategoryChips()
+            updateGiftedFilterButtonUI()
+            recomputeFilteredCatalog()
+        }
+
+        btnResetStoreFilters.setOnClickListener {
+            isGiftedFilterActive = false
+            currentStoreCategory = "All"
+            currentStoreSubTag = "All"
+            currentStoreSearchQuery = ""
+            etStoreSearch.text.clear()
+            updateGiftedFilterButtonUI()
             recomputeFilteredCatalog()
         }
     }

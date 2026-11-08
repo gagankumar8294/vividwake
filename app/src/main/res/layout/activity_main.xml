@@ -357,46 +357,19 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <!-- Concept 1: Unified Command Bar (Single 44dp row) -->
             <LinearLayout
+                android:id="@+id/layoutStoreCommandBar"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="44dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/tvStoreCatalogHeader"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Tap any card to stream preview. Download to set as wallpaper."
-                    android:textColor="#B0A8C0"
-                    android:textSize="12sp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRefreshStore"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:text="Refresh"
-                    android:textAllCaps="false"
-                    android:textColor="#D4AF37"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <!-- Search & Browse Categories Row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
+                <!-- Search Input Container (Flexible width) -->
                 <LinearLayout
                     android:id="@+id/layoutStoreSearchBar"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_search_glass"
                     android:gravity="center_vertical"
@@ -417,7 +390,7 @@
                         android:layout_marginStart="8dp"
                         android:layout_weight="1"
                         android:background="@null"
-                        android:hint="Search wallpapers, games, heroes..."
+                        android:hint="Search wallpapers..."
                         android:imeOptions="actionDone"
                         android:singleLine="true"
                         android:textColor="#FFFFFF"
@@ -434,24 +407,47 @@
                         app:tint="#D4AF37" />
                 </LinearLayout>
 
+                <!-- 🎁 Gifted Filter Toggle Button -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnBrowseCategories"
+                    android:id="@+id/btnFilterGifted"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="42dp"
+                    android:layout_height="44dp"
                     android:layout_marginStart="8dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:text="Browse"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:text="🎁 Gifted"
                     android:textAllCaps="false"
                     android:textColor="#D4AF37"
                     android:textSize="12sp"
+                    android:textStyle="bold"
                     app:backgroundTint="#261E38"
                     app:cornerRadius="10dp"
-                    app:strokeColor="#40D4AF37" />
+                    app:strokeColor="#50D4AF37"
+                    app:strokeWidth="1.2dp" />
+
+                <!-- ⚙ Category Filter Modal Button -->
+                <FrameLayout
+                    android:id="@+id/btnStoreFilterCategories"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_search_glass"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_folder"
+                        app:tint="#D4AF37" />
+                </FrameLayout>
             </LinearLayout>
 
-            <!-- Active Sub-Filter & Breadcrumb Banner -->
+            <!-- Active Category Breadcrumb Banner (Shown only if a specific filter is active) -->
             <LinearLayout
                 android:id="@+id/layoutActiveFilterBanner"
                 android:layout_width="match_parent"
@@ -461,9 +457,9 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
-                android:paddingTop="6dp"
+                android:paddingTop="4dp"
                 android:paddingEnd="8dp"
-                android:paddingBottom="6dp"
+                android:paddingBottom="4dp"
                 android:visibility="gone">
 
                 <TextView
@@ -471,61 +467,25 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Showing: Gaming"
+                    android:text="Showing: All"
                     android:textColor="#E8E2F2"
-                    android:textSize="12sp" />
+                    android:textSize="11.5sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnResetActiveFilter"
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
-                    android:layout_height="32dp"
+                    android:layout_height="30dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:minWidth="0dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:text="Clear"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="✕ Clear"
                     android:textAllCaps="false"
                     android:textColor="#D4AF37"
                     android:textSize="11sp" />
             </LinearLayout>
-
-            <!-- Horizontal Category Filter Bar -->
-            <HorizontalScrollView
-                android:id="@+id/hsvStoreCategories"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:overScrollMode="never"
-                android:scrollbars="none">
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chipGroupStoreCategories"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:singleLine="true"
-                    app:singleSelection="true"
-                    app:selectionRequired="true" />
-            </HorizontalScrollView>
-
-            <!-- Sub-Category / Franchise / Character Quick Discovery Bar -->
-            <HorizontalScrollView
-                android:id="@+id/hsvStoreSubTags"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:overScrollMode="never"
-                android:scrollbars="none">
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chipGroupStoreSubTags"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:singleLine="true"
-                    app:singleSelection="true"
-                    app:selectionRequired="false" />
-            </HorizontalScrollView>
 
             <!-- Empty Search / Filter State Layout -->
             <LinearLayout

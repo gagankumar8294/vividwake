@@ -199,6 +199,7 @@ class StoreWallpaperAdapter(
         private val tvSize: TextView = itemView.findViewById(R.id.tvStoreSize)
         private val tvFeaturedBadge: TextView = itemView.findViewById(R.id.tvStoreFeaturedBadge)
         private val tvDownloadedBadge: TextView = itemView.findViewById(R.id.tvStoreDownloadedBadge)
+        private val tvGiftedBadge: TextView? = itemView.findViewById(R.id.tvStoreGiftedBadge)
         private val pbDownload: ProgressBar = itemView.findViewById(R.id.pbStoreDownload)
         private val tvProgress: TextView = itemView.findViewById(R.id.tvStoreProgressText)
         private val btnDownload: MaterialButton = itemView.findViewById(R.id.btnStoreDownload)
@@ -222,6 +223,7 @@ class StoreWallpaperAdapter(
             // Badges
             tvFeaturedBadge.visibility = if (item.isFeatured) View.VISIBLE else View.GONE
             tvDownloadedBadge.visibility = if (item.isDownloaded) View.VISIBLE else View.GONE
+            tvGiftedBadge?.visibility = if (item.isGifted) View.VISIBLE else View.GONE
 
             val currentProgress = downloadingProgressMap[item.id]
             val isDownloading = currentProgress != null

@@ -177,6 +177,9 @@ class CloudCatalogRepository(
                     continue
                 }
 
+                val isServerGifted = obj.optBoolean("isGifted", false)
+                val isGifted = isServerGifted || (isExplicitlyAllowed && status != "published")
+
                 val isDownloaded = if (downloadedIds.contains(id)) {
                     val f = downloadManager.getLocalVideoFile(id)
                     f.exists() && f.length() > 0
@@ -205,6 +208,7 @@ class CloudCatalogRepository(
                         status = status,
                         isFeatured = isFeatured,
                         isVipOnly = isVipOnly,
+                        isGifted = isGifted,
                         category = category,
                         tags = tagsList
                     )

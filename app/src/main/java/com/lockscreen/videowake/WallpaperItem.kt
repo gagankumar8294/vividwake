@@ -25,6 +25,7 @@ data class WallpaperItem(
     val status: String = "published", // "published" | "hidden" | "draft"
     val isFeatured: Boolean = false,
     val isVipOnly: Boolean = false,
+    val isGifted: Boolean = false,
     val category: String = "General",
     val tags: List<String> = emptyList()
 ) : Serializable
