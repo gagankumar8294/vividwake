@@ -164,20 +164,22 @@ class CloudCatalogRepository(
                     continue
                 }
 
+                val isServerGifted = obj.optBoolean("isGifted", false)
+
                 // 2. Explicitly allowed check
-                val isExplicitlyAllowed = (normEmail.isNotBlank() && allowedUsersList.contains(normEmail)) ||
+                val isExplicitlyAllowed = isServerGifted ||
+                                         (normEmail.isNotBlank() && allowedUsersList.contains(normEmail)) ||
                                          (normUid.isNotBlank() && allowedUsersList.contains(normUid)) ||
                                          assignedIds.contains(id)
 
                 // 3. User Visibility rule:
                 // Normal users on mobile see published wallpapers (unless blocked)
-                // Draft / Restricted wallpapers are visible ONLY if user is explicitly granted access by the Web Admin!
+                // Draft / Restricted wallpapers are visible ONLY if user is explicitly granted access or gifted by the Web Admin!
                 val isVisible = (status == "published") || isExplicitlyAllowed
                 if (!isVisible) {
                     continue
                 }
 
-                val isServerGifted = obj.optBoolean("isGifted", false)
                 val isGifted = isServerGifted || (isExplicitlyAllowed && status != "published")
 
                 val isDownloaded = if (downloadedIds.contains(id)) {
