@@ -62,23 +62,24 @@
                         android:alpha="0.5" />
                 </FrameLayout>
 
-                <!-- Featured Badge: Restored to previous rectangular tag -->
+                <!-- Featured Badge: Slim height, full width -->
                 <TextView
                     android:id="@+id/tvStoreFeaturedBadge"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="16dp"
                     android:layout_gravity="top|start"
                     android:layout_margin="4dp"
-                    android:background="#D4AF37"
+                    android:background="@drawable/bg_featured_badge_mini"
                     android:paddingHorizontal="6dp"
-                    android:paddingVertical="2dp"
-                    android:gravity="center_vertical"
-                    android:drawableStart="@drawable/ic_sparkle"
+                    android:paddingVertical="0dp"
+                    android:includeFontPadding="false"
+                    android:gravity="center"
+                    android:drawableStart="@drawable/ic_sparkle_mini"
                     android:drawablePadding="2dp"
                     android:drawableTint="#0E0B16"
                     android:text="FEATURED"
                     android:textColor="#0E0B16"
-                    android:textSize="9sp"
+                    android:textSize="8.5sp"
                     android:textStyle="bold"
                     android:visibility="gone" />
 
