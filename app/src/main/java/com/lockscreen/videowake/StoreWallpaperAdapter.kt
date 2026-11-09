@@ -321,9 +321,9 @@ class StoreWallpaperAdapter(
                 pbDownload.visibility = View.GONE
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.VISIBLE
-                btnDownload.text = "Download"
+                btnDownload.text = if (item.sizeDisplay.isNotBlank()) "Download (${item.sizeDisplay})" else "Download"
                 btnApply.visibility = View.GONE
-                btnPreview.visibility = View.VISIBLE
+                btnPreview.visibility = View.GONE
                 btnDeleteLocal.visibility = View.GONE
             }
 
