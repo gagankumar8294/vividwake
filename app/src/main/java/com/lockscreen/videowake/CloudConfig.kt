@@ -27,12 +27,12 @@ object CloudConfig {
         "isVipOnly": false,
         "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/sabrina-carpenter-video.mp4",
         "thumbUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/sabrina-carpenter-kiss-image.jpg",
-        "sizeBytes": 51157062,
-        "sizeDisplay": "48.79 MB",
+        "sizeBytes": 27493101,
+        "sizeDisplay": "26.22 MB",
         "durationMs": 14100,
         "width": 1080,
         "height": 1920,
-        "version": 1
+        "version": 2
       },
       {
         "id": "wp_game_character_01",
