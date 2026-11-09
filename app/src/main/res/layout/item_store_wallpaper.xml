@@ -107,6 +107,22 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- Selected from Notification Drop Badge -->
+            <TextView
+                android:id="@+id/tvStoreNotificationBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:background="@drawable/bg_featured_badge_mini"
+                android:backgroundTint="#D4AF37"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="2dp"
+                android:text="✨ NOTIFICATION DROP"
+                android:textColor="#0E0B16"
+                android:textSize="8.5sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/tvStoreTitle"
                 android:layout_width="match_parent"

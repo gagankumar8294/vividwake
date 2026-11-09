@@ -3,6 +3,7 @@ package com.lockscreen.videowake
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.MediaMetadataRetriever
 import android.util.Log
 import android.util.LruCache
@@ -74,6 +75,26 @@ class StoreWallpaperAdapter(
 
     private val rows = mutableListOf<StoreRow>()
     private val downloadingProgressMap = mutableMapOf<String, Int>()
+    private var highlightedWallpaperId: String? = null
+
+    fun setHighlightedWallpaperId(id: String?) {
+        if (highlightedWallpaperId == id) return
+        highlightedWallpaperId = id
+        notifyDataSetChanged()
+    }
+
+    fun getHighlightedWallpaperId(): String? = highlightedWallpaperId
+
+    fun clearHighlight() {
+        if (highlightedWallpaperId != null) {
+            highlightedWallpaperId = null
+            notifyDataSetChanged()
+        }
+    }
+
+    private fun dpToPx(dp: Float): Int {
+        return (dp * context.resources.displayMetrics.density + 0.5f).toInt()
+    }
 
     fun submitList(catalogItems: List<WallpaperItem>) {
         submitInitialList(catalogItems)
@@ -202,6 +223,7 @@ class StoreWallpaperAdapter(
         private val ivGiftedIcon: View? = itemView.findViewById(R.id.ivStoreGiftedIcon)
         private val pbDownload: ProgressBar = itemView.findViewById(R.id.pbStoreDownload)
         private val tvProgress: TextView = itemView.findViewById(R.id.tvStoreProgressText)
+        private val tvNotificationBadge: TextView? = itemView.findViewById(R.id.tvStoreNotificationBadge)
         private val btnDownload: MaterialButton = itemView.findViewById(R.id.btnStoreDownload)
         private val btnApply: MaterialButton = itemView.findViewById(R.id.btnStoreApply)
         private val btnDeleteLocal: MaterialButton = itemView.findViewById(R.id.btnStoreDeleteLocal)
@@ -216,6 +238,38 @@ class StoreWallpaperAdapter(
         }
 
         fun bind(item: WallpaperItem) {
+            val isHighlighted = !highlightedWallpaperId.isNullOrBlank() && (
+                item.id.equals(highlightedWallpaperId, ignoreCase = true) ||
+                item.title.contains(highlightedWallpaperId!!, ignoreCase = true) ||
+                highlightedWallpaperId!!.contains(item.title, ignoreCase = true) ||
+                (item.cloudId.isNotBlank() && item.cloudId.equals(highlightedWallpaperId, ignoreCase = true))
+            )
+
+            if (!highlightedWallpaperId.isNullOrBlank()) {
+                if (isHighlighted) {
+                    // Prominently highlighted card: full opacity, glowing gold border, elevated background
+                    card.alpha = 1.0f
+                    card.strokeColor = Color.parseColor("#D4AF37")
+                    card.strokeWidth = dpToPx(2.5f)
+                    card.setCardBackgroundColor(Color.parseColor("#261B38"))
+                    tvNotificationBadge?.visibility = View.VISIBLE
+                } else {
+                    // Non-matching cards dimmed so the target card is immediately clear to the user
+                    card.alpha = 0.40f
+                    card.strokeColor = Color.parseColor("#241A35")
+                    card.strokeWidth = dpToPx(1f)
+                    card.setCardBackgroundColor(Color.parseColor("#130F20"))
+                    tvNotificationBadge?.visibility = View.GONE
+                }
+            } else {
+                // Default normal styling when no notification highlight is active
+                card.alpha = 1.0f
+                card.strokeColor = Color.parseColor("#3D3254")
+                card.strokeWidth = dpToPx(1f)
+                card.setCardBackgroundColor(Color.parseColor("#1A1528"))
+                tvNotificationBadge?.visibility = View.GONE
+            }
+
             tvTitle.text = item.title
             tvDescription.text = item.description.ifBlank { "4K animated loop lock screen wallpaper." }
             tvSize.text = item.sizeDisplay.ifBlank { "Cloud Video" }
@@ -254,6 +308,7 @@ class StoreWallpaperAdapter(
 
             // Click anywhere on card: if downloaded, select it; if not downloaded, stream live preview
             card.setOnClickListener {
+                setHighlightedWallpaperId(item.id)
                 if (item.isDownloaded) {
                     onApply(item)
                 } else {

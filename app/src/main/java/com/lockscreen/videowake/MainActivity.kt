@@ -1511,6 +1511,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             currentStorePage = (neededCount / STORE_PAGE_SIZE) + 1
                         }
 
+                        // Prominently highlight this card and dim all other store cards
+                        storeAdapter.setHighlightedWallpaperId(targetItem.id)
+
                         // Immediately begin live video streaming in the preview mockup
                         playStreamingVideoInPreview(targetItem)
 
