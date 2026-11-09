@@ -16,6 +16,25 @@ object CloudConfig {
     fun getBuiltinCatalogJson(): String = """
     [
       {
+        "id": "wp_sabrina_carpenter_viral_kiss_01",
+        "title": "Sabrina Carpenter - Taste Kiss Scene",
+        "category": "Celebrity & Music",
+        "subCategory": "Viral Pop & Music Videos",
+        "description": "The viral internet sensation: pop star Sabrina Carpenter's iconic cinematic kiss scene from the global hit 'Taste' music video with Jenna Ortega.",
+        "tags": ["Sabrina Carpenter", "Taste", "Viral Kiss", "Jenna Ortega", "Pop Music", "Celebrity", "Music Video", "Short n Sweet", "Trending", "Aesthetic"],
+        "status": "published",
+        "isFeatured": true,
+        "isVipOnly": false,
+        "videoUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/sabrina-carpenter-video.mp4",
+        "thumbUrl": "https://github.com/gagankumar8294/vividwake/releases/download/v1.0.0/sabrina-carpenter-kiss-image.jpg",
+        "sizeBytes": 51157062,
+        "sizeDisplay": "48.79 MB",
+        "durationMs": 14100,
+        "width": 1080,
+        "height": 1920,
+        "version": 1
+      },
+      {
         "id": "wp_game_character_01",
         "title": "Game Character Wake",
         "category": "Gaming",

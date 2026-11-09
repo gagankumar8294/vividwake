@@ -117,6 +117,7 @@ class CloudCatalogRepository(
                 val id = obj.optString("id", "cloud_wp_$i")
                 val title = obj.optString("title", "Cloud Wallpaper")
                 val category = obj.optString("category", "General")
+                val subCategory = obj.optString("subCategory", "")
                 val description = obj.optString("description", "")
                 val status = obj.optString("status", "draft")
                 val isFeatured = obj.optBoolean("isFeatured", false)
@@ -214,6 +215,7 @@ class CloudCatalogRepository(
                         isVipOnly = isVipOnly,
                         isGifted = isGifted,
                         category = category,
+                        subCategory = subCategory,
                         tags = tagsList
                     )
                 )

@@ -27,5 +27,6 @@ data class WallpaperItem(
     val isVipOnly: Boolean = false,
     val isGifted: Boolean = false,
     val category: String = "General",
+    val subCategory: String = "",
     val tags: List<String> = emptyList()
 ) : Serializable

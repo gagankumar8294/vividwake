@@ -1121,6 +1121,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val qTag = currentStoreSubTag.lowercase()
             result = result.filter { item ->
                 item.tags.any { it.lowercase() == qTag || it.lowercase().contains(qTag) } ||
+                item.subCategory.lowercase().contains(qTag) ||
                 item.title.lowercase().contains(qTag) ||
                 item.description.lowercase().contains(qTag)
             }
@@ -1134,6 +1135,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     item.title.lowercase().contains(t) ||
                     item.description.lowercase().contains(t) ||
                     item.category.lowercase().contains(t) ||
+                    item.subCategory.lowercase().contains(t) ||
                     item.tags.any { it.lowercase().contains(t) }
                 }
             }
