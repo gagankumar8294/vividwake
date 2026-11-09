@@ -1473,18 +1473,78 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         // 2. Otherwise navigate to Explore Store
         switchToStoreTab()
         lifecycleScope.launch {
+            // Wait for cloud catalog to finish loading if currently empty or skeleton is visible
             var attempts = 0
-            while (filteredCatalogList.isEmpty() && attempts < 15) {
-                kotlinx.coroutines.delay(200)
+            while ((fullCatalogList.isEmpty() || layoutStoreSkeleton.visibility == View.VISIBLE) && attempts < 30) {
+                kotlinx.coroutines.delay(150)
                 attempts++
             }
-            val storePos = filteredCatalogList.indexOfFirst {
+
+            // Find matching item in full catalog
+            val targetItem = fullCatalogList.find {
                 it.id.equals(wallpaperId, ignoreCase = true) ||
-                it.title.contains(wallpaperId, ignoreCase = true)
+                it.title.contains(wallpaperId, ignoreCase = true) ||
+                it.id.contains(wallpaperId, ignoreCase = true)
             }
-            if (storePos >= 0) {
-                rvStoreWallpapers.smoothScrollToPosition(storePos)
-                showGlassToast("Found in Explore Store!", isSuccess = true)
+
+            if (targetItem != null) {
+                withContext(Dispatchers.Main) {
+                    // Reset any filters that might hide the target item
+                    if (isGiftedFilterActive || currentStoreCategory != "All" || currentStoreSearchQuery.isNotBlank() || currentStoreSubTag != "All") {
+                        isGiftedFilterActive = false
+                        currentStoreCategory = "All"
+                        currentStoreSubTag = "All"
+                        currentStoreSearchQuery = ""
+                        etStoreSearch.setText("")
+                        btnClearStoreSearch.visibility = View.GONE
+                        recomputeFilteredCatalog()
+                        updateActiveFilterBanner()
+                    }
+
+                    val targetIndex = filteredCatalogList.indexOfFirst { it.id == targetItem.id }
+                    if (targetIndex >= 0) {
+                        // Ensure adapter contains items up to this index
+                        val neededCount = maxOf(STORE_PAGE_SIZE, targetIndex + 5)
+                        if (neededCount > currentStorePage * STORE_PAGE_SIZE) {
+                            val batch = filteredCatalogList.take(neededCount)
+                            storeAdapter.submitInitialList(batch)
+                            currentStorePage = (neededCount / STORE_PAGE_SIZE) + 1
+                        }
+
+                        // Immediately begin live video streaming in the preview mockup
+                        playStreamingVideoInPreview(targetItem)
+
+                        // Smoothly scroll NestedScrollView directly down to the wallpaper card
+                        nestedScrollViewMain.postDelayed({
+                            val lm = rvStoreWallpapers.layoutManager
+                            val child = lm?.findViewByPosition(targetIndex)
+                            if (child != null) {
+                                val locChild = IntArray(2)
+                                val locScroll = IntArray(2)
+                                child.getLocationInWindow(locChild)
+                                nestedScrollViewMain.getLocationInWindow(locScroll)
+                                val targetY = nestedScrollViewMain.scrollY + (locChild[1] - locScroll[1]) - 160
+                                nestedScrollViewMain.smoothScrollTo(0, maxOf(0, targetY))
+
+                                // Visual pulse highlight on the card
+                                child.alpha = 0.35f
+                                child.animate().alpha(1.0f).setDuration(600).start()
+                            } else {
+                                // Fallback estimation: store section top + card offset
+                                val approxCardHeight = (280 * resources.displayMetrics.density).toInt()
+                                val targetY = layoutExploreStore.top + (targetIndex * approxCardHeight)
+                                nestedScrollViewMain.smoothScrollTo(0, targetY)
+                            }
+                            showGlassToast("Previewing '${targetItem.title}'", isSuccess = true)
+                        }, 350)
+                    }
+                }
+                return@launch
+            }
+
+            // Fallback: if not found, scroll to top of Explore Store
+            withContext(Dispatchers.Main) {
+                nestedScrollViewMain.smoothScrollTo(0, layoutExploreStore.top)
             }
         }
     }
