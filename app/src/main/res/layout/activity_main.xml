@@ -914,26 +914,28 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Floating Video Preview Overlay (Exact 320dp height, sticks at TOP like a card) -->
+    <!-- Floating Video Preview Dock (Full width, rounded bottom corners, no dim backdrop so records below scroll freely) -->
     <FrameLayout
         android:id="@+id/layoutFloatingPreviewOverlay"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#88000000"
-        android:clickable="true"
-        android:focusable="true"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:focusable="false"
+        android:elevation="28dp"
         android:visibility="gone">
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardFloatingPreview"
             android:layout_width="match_parent"
             android:layout_height="320dp"
-            android:layout_gravity="top|center_horizontal"
-            android:layout_marginTop="20dp"
-            android:layout_marginHorizontal="20dp"
+            android:layout_gravity="top"
+            android:layout_marginTop="0dp"
+            android:layout_marginHorizontal="0dp"
             app:cardBackgroundColor="#1A1528"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="18dp"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.BottomRoundedCard"
+            app:cardElevation="24dp"
             app:strokeColor="#D4AF37"
             app:strokeWidth="1.5dp">
 
@@ -1085,16 +1087,16 @@
                         android:textStyle="bold" />
                 </FrameLayout>
 
-                <!-- Bottom Action Bar: Wallpaper Title + Set Active Button -->
+                <!-- Bottom Action Bar: Wallpaper Title + Center Collapse Button + Set Active Button -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_gravity="bottom"
-                    android:background="#B30E0B16"
+                    android:background="#CC0E0B16"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:paddingVertical="10dp">
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="8dp">
 
                     <TextView
                         android:id="@+id/tvFloatingWallpaperDesc"
@@ -1105,22 +1107,44 @@
                         android:maxLines="1"
                         android:text="Active Lock Screen Preview"
                         android:textColor="#B0A8C0"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
+
+                    <!-- Center Collapse Arrow / Close Handle Button -->
+                    <LinearLayout
+                        android:id="@+id/btnFloatingPreviewCollapse"
+                        android:layout_width="wrap_content"
+                        android:layout_height="32dp"
+                        android:background="@drawable/bg_glass_toast"
+                        android:backgroundTint="#2D1D45"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center"
+                        android:layout_marginHorizontal="6dp"
+                        android:paddingHorizontal="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="▲  Close Preview"
+                            android:textColor="#E5D9F8"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFloatingPreviewApply"
                         android:layout_width="wrap_content"
-                        android:layout_height="36dp"
+                        android:layout_height="32dp"
                         android:background="@drawable/bg_glass_toast"
                         android:backgroundTint="#D4AF37"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
-                        android:paddingHorizontal="14dp"
+                        android:paddingHorizontal="12dp"
                         android:text="Set Active"
                         android:textColor="#0E0B16"
-                        android:textSize="12sp"
+                        android:textSize="11sp"
                         android:textStyle="bold"
-                        app:cornerRadius="18dp" />
+                        app:cornerRadius="16dp" />
                 </LinearLayout>
 
             </FrameLayout>
