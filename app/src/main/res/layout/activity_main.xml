@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/nestedScrollViewMain"
+    android:id="@+id/rootMainContainer"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E0B16"
-    android:fillViewport="true">
+    android:background="#0E0B16">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScrollViewMain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0E0B16"
+        android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -137,6 +143,7 @@
 
         <!-- Video Preview Card -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardVideoPreview"
             android:layout_width="match_parent"
             android:layout_height="320dp"
             android:layout_marginTop="16dp"
@@ -865,3 +872,258 @@
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
+
+    <!-- Floating "Preview Video" Pill Button (Horizontally centered at TOP, animated) -->
+    <LinearLayout
+        android:id="@+id/layoutFloatingPreviewBtnWrapper"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="20dp"
+        android:clickable="false"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/btnFloatingPreview"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_floating_preview_btn"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="16dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="▶"
+                android:textColor="#D4AF37"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Preview Video"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Floating Video Preview Overlay (Exact 320dp height, sticks at TOP like a card) -->
+    <FrameLayout
+        android:id="@+id/layoutFloatingPreviewOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#88000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardFloatingPreview"
+            android:layout_width="match_parent"
+            android:layout_height="320dp"
+            android:layout_gravity="top|center_horizontal"
+            android:layout_marginTop="20dp"
+            android:layout_marginHorizontal="20dp"
+            app:cardBackgroundColor="#1A1528"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="18dp"
+            app:strokeColor="#D4AF37"
+            app:strokeWidth="1.5dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <TextureView
+                    android:id="@+id/floatingPreviewTextureView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+
+                <!-- Mock Lock Screen Clock & Notification Note Overlay -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top"
+                    android:layout_marginTop="24dp"
+                    android:clickable="false"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical">
+
+                    <!-- Digital Clock -->
+                    <TextClock
+                        android:id="@+id/tcFloatingMockClock"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-light"
+                        android:format12Hour="h:mm"
+                        android:format24Hour="HH:mm"
+                        android:shadowColor="#80000000"
+                        android:shadowDx="0"
+                        android:shadowDy="2"
+                        android:shadowRadius="8"
+                        android:textColor="#FFFFFF"
+                        android:textSize="44sp"
+                        android:textStyle="bold" />
+
+                    <!-- Date & Clock Icon Row -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="-4dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
+                            android:layout_marginEnd="6dp"
+                            android:src="@drawable/ic_clock"
+                            app:tint="#D4AF37" />
+
+                        <TextClock
+                            android:id="@+id/tcFloatingMockDate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:format12Hour="EEE, MMM d"
+                            android:format24Hour="EEE, d MMM"
+                            android:shadowColor="#80000000"
+                            android:shadowDx="0"
+                            android:shadowDy="1"
+                            android:shadowRadius="4"
+                            android:textColor="#E0E0E0"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <!-- Mock Notification Note -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="24dp"
+                        android:layout_marginTop="14dp"
+                        android:background="@drawable/bg_glass_toast"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="14dp"
+                        android:paddingVertical="7dp">
+
+                        <ImageView
+                            android:layout_width="15dp"
+                            android:layout_height="15dp"
+                            android:layout_marginEnd="8dp"
+                            android:src="@drawable/ic_clock"
+                            app:tint="#D4AF37" />
+
+                        <TextView
+                            android:id="@+id/tvFloatingMockNotificationText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:text="VividWake • Preview"
+                            android:textColor="#FFFFFF"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Floating Live Preview Badge (Top Left) -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="12dp"
+                    android:background="@drawable/bg_glass_toast"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="5dp">
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_circle_avatar"
+                        android:backgroundTint="#00FF88" />
+
+                    <TextView
+                        android:id="@+id/tvFloatingPreviewTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxWidth="160dp"
+                        android:maxLines="1"
+                        android:text="Live Preview"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- Close Button (Top Right "✕") -->
+                <FrameLayout
+                    android:id="@+id/btnFloatingPreviewClose"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="top|end"
+                    android:layout_margin="10dp"
+                    android:background="@drawable/bg_glass_toast"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:elevation="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="✕"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
+
+                <!-- Bottom Action Bar: Wallpaper Title + Set Active Button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:background="#B30E0B16"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp">
+
+                    <TextView
+                        android:id="@+id/tvFloatingWallpaperDesc"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Active Lock Screen Preview"
+                        android:textColor="#B0A8C0"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnFloatingPreviewApply"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_glass_toast"
+                        android:backgroundTint="#D4AF37"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:paddingHorizontal="14dp"
+                        android:text="Set Active"
+                        android:textColor="#0E0B16"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        app:cornerRadius="18dp" />
+                </LinearLayout>
+
+            </FrameLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </FrameLayout>
+</FrameLayout>

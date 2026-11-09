@@ -323,13 +323,11 @@ class StoreWallpaperAdapter(
                 btnDeleteLocal.visibility = View.GONE
             }
 
-            // Click anywhere on card: if downloaded, select it; if not downloaded, stream live preview
+            // Click anywhere on card: if downloaded, select & preview it; if not downloaded, only select & highlight border without streaming or background download
             card.setOnClickListener {
                 selectWallpaper(item.id)
                 if (item.isDownloaded) {
                     onApply(item)
-                } else {
-                    onPreview(item)
                 }
             }
 

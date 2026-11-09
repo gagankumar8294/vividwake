@@ -54,6 +54,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
@@ -125,6 +126,22 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var tvNotificationFocusText: TextView
     private lateinit var btnDismissNotificationFocus: MaterialButton
     private var notificationFocusJob: Job? = null
+
+    // Floating Video Preview & Centered Pill Button Components
+    private lateinit var layoutFloatingPreviewBtnWrapper: View
+    private lateinit var btnFloatingPreview: View
+    private lateinit var layoutFloatingPreviewOverlay: FrameLayout
+    private lateinit var cardFloatingPreview: MaterialCardView
+    private lateinit var floatingPreviewTextureView: TextureView
+    private lateinit var tvFloatingPreviewTitle: TextView
+    private lateinit var tvFloatingMockNotificationText: TextView
+    private lateinit var tvFloatingWallpaperDesc: TextView
+    private lateinit var btnFloatingPreviewClose: FrameLayout
+    private lateinit var btnFloatingPreviewApply: MaterialButton
+
+    private var floatingPlayer: MediaPlayer? = null
+    private var floatingSurface: Surface? = null
+    private var currentFloatingItem: WallpaperItem? = null
 
     private var isGiftedFilterActive: Boolean = false
     private var isSearchExpanded: Boolean = false
@@ -523,6 +540,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         detectDeviceBrand()
         setupGalleryRecyclerView()
         setupStoreRecyclerView()
+        setupFloatingPreviewControls()
         loadSavedSettings()
         setupTabSwitching()
         setupListeners()
@@ -729,13 +747,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             context = this,
             scope = lifecycleScope,
             onPreview = { item ->
-                playStreamingVideoInPreview(item)
+                if (item.isDownloaded) {
+                    selectWallpaper(item)
+                    if (isTopPreviewScrolledOff()) {
+                        showFloatingPreview(item)
+                    }
+                }
             },
             onDownload = { item ->
                 downloadCloudWallpaper(item)
             },
             onApply = { item ->
                 selectWallpaper(item)
+                if (isTopPreviewScrolledOff()) {
+                    showFloatingPreview(item)
+                }
             },
             onDeleteLocal = { item ->
                 confirmDeleteCloudDownload(item)
@@ -745,8 +771,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         rvStoreWallpapers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         rvStoreWallpapers.adapter = storeAdapter
 
-        // Fetch on scroll: when scrolling near bottom of NestedScrollView, load next page chunk
+        // Fetch on scroll & sync floating preview button
         nestedScrollViewMain.setOnScrollChangeListener(androidx.core.widget.NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
+            checkFloatingButtonVisibility()
+
             if (layoutExploreStore.visibility == View.VISIBLE && !isStoreLoadingMore && (currentStorePage * STORE_PAGE_SIZE < filteredCatalogList.size)) {
                 val child = v.getChildAt(0)
                 if (child != null) {
@@ -757,6 +785,229 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 }
             }
         })
+    }
+
+    private fun setupFloatingPreviewControls() {
+        layoutFloatingPreviewBtnWrapper = findViewById(R.id.layoutFloatingPreviewBtnWrapper)
+        btnFloatingPreview = findViewById(R.id.btnFloatingPreview)
+        layoutFloatingPreviewOverlay = findViewById(R.id.layoutFloatingPreviewOverlay)
+        cardFloatingPreview = findViewById(R.id.cardFloatingPreview)
+        floatingPreviewTextureView = findViewById(R.id.floatingPreviewTextureView)
+        tvFloatingPreviewTitle = findViewById(R.id.tvFloatingPreviewTitle)
+        tvFloatingMockNotificationText = findViewById(R.id.tvFloatingMockNotificationText)
+        tvFloatingWallpaperDesc = findViewById(R.id.tvFloatingWallpaperDesc)
+        btnFloatingPreviewClose = findViewById(R.id.btnFloatingPreviewClose)
+        btnFloatingPreviewApply = findViewById(R.id.btnFloatingPreviewApply)
+
+        floatingPreviewTextureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
+                floatingSurface = Surface(surfaceTexture)
+                currentFloatingItem?.let { playInFloatingPreview(it) }
+            }
+            override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {}
+            override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                stopFloatingPlayback()
+                floatingSurface?.release()
+                floatingSurface = null
+                return true
+            }
+            override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
+        }
+
+        btnFloatingPreview.setOnClickListener {
+            val selectedId = storeAdapter.getSelectedWallpaperId()
+            val itemToPreview = if (!selectedId.isNullOrBlank()) {
+                fullCatalogList.find { it.id.equals(selectedId, ignoreCase = true) || (it.cloudId.isNotBlank() && it.cloudId.equals(selectedId, ignoreCase = true)) }
+                    ?: repository.getActiveWallpaper()
+            } else {
+                repository.getActiveWallpaper()
+            }
+            showFloatingPreview(itemToPreview)
+        }
+
+        btnFloatingPreviewClose.setOnClickListener {
+            hideFloatingPreview()
+        }
+
+        layoutFloatingPreviewOverlay.setOnClickListener {
+            hideFloatingPreview()
+        }
+
+        cardFloatingPreview.setOnClickListener {
+            // Prevent overlay dismissal when clicking inside the preview card
+        }
+
+        btnFloatingPreviewApply.setOnClickListener {
+            currentFloatingItem?.let { item ->
+                selectWallpaper(item)
+                showGlassToast("Selected '${item.title}' as active wallpaper", isSuccess = true)
+                hideFloatingPreview()
+            }
+        }
+    }
+
+    private fun isTopPreviewScrolledOff(): Boolean {
+        val card = findViewById<View>(R.id.cardVideoPreview)
+        return if (card != null && card.bottom > 0) {
+            nestedScrollViewMain.scrollY >= (card.bottom - 80)
+        } else {
+            nestedScrollViewMain.scrollY >= (320 * resources.displayMetrics.density)
+        }
+    }
+
+    private fun checkFloatingButtonVisibility() {
+        if (!::layoutFloatingPreviewOverlay.isInitialized || !::layoutFloatingPreviewBtnWrapper.isInitialized) return
+
+        val isScrolledOff = isTopPreviewScrolledOff()
+
+        if (isScrolledOff) {
+            if (layoutFloatingPreviewOverlay.visibility != View.VISIBLE) {
+                showFloatingButton()
+            }
+        } else {
+            hideFloatingButton(animate = true)
+            if (layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
+                hideFloatingPreview()
+            }
+        }
+    }
+
+    private fun showFloatingButton() {
+        if (!::layoutFloatingPreviewBtnWrapper.isInitialized) return
+        if (layoutFloatingPreviewBtnWrapper.visibility == View.VISIBLE) return
+        layoutFloatingPreviewBtnWrapper.visibility = View.VISIBLE
+        layoutFloatingPreviewBtnWrapper.alpha = 0f
+        layoutFloatingPreviewBtnWrapper.translationY = -60f
+        layoutFloatingPreviewBtnWrapper.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(240)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
+    }
+
+    private fun hideFloatingButton(animate: Boolean = true) {
+        if (!::layoutFloatingPreviewBtnWrapper.isInitialized) return
+        if (layoutFloatingPreviewBtnWrapper.visibility != View.VISIBLE) return
+        if (animate) {
+            layoutFloatingPreviewBtnWrapper.animate()
+                .alpha(0f)
+                .translationY(-60f)
+                .setDuration(180)
+                .withEndAction {
+                    layoutFloatingPreviewBtnWrapper.visibility = View.GONE
+                }
+                .start()
+        } else {
+            layoutFloatingPreviewBtnWrapper.visibility = View.GONE
+        }
+    }
+
+    private fun showFloatingPreview(item: WallpaperItem) {
+        if (!::layoutFloatingPreviewOverlay.isInitialized) return
+        currentFloatingItem = item
+        tvFloatingPreviewTitle.text = item.title
+        tvFloatingMockNotificationText.text = "${item.title} • Preview"
+        tvFloatingWallpaperDesc.text = item.description.ifBlank { "4K animated loop lock screen wallpaper." }
+
+        // Stop top preview playback to preserve hardware decoding resources & prevent audio overlap
+        stopPreviewPlayback()
+        hideFloatingButton(animate = false)
+
+        if (layoutFloatingPreviewOverlay.visibility != View.VISIBLE) {
+            layoutFloatingPreviewOverlay.alpha = 0f
+            layoutFloatingPreviewOverlay.visibility = View.VISIBLE
+            // Slide down smoothly from the top like a card and stick there
+            cardFloatingPreview.translationY = -600f
+            cardFloatingPreview.alpha = 0.3f
+            layoutFloatingPreviewOverlay.animate().alpha(1f).setDuration(220).start()
+            cardFloatingPreview.animate()
+                .translationY(0f)
+                .alpha(1f)
+                .setDuration(280)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        }
+
+        if (floatingSurface != null) {
+            playInFloatingPreview(item)
+        }
+    }
+
+    private fun hideFloatingPreview() {
+        if (!::layoutFloatingPreviewOverlay.isInitialized || layoutFloatingPreviewOverlay.visibility != View.VISIBLE) return
+        stopFloatingPlayback()
+        currentFloatingItem = null
+
+        // Slide back up to the top and fade out
+        cardFloatingPreview.animate()
+            .translationY(-600f)
+            .alpha(0f)
+            .setDuration(200)
+            .start()
+
+        layoutFloatingPreviewOverlay.animate()
+            .alpha(0f)
+            .setDuration(200)
+            .withEndAction {
+                layoutFloatingPreviewOverlay.visibility = View.GONE
+                checkFloatingButtonVisibility()
+            }
+            .start()
+
+        if (previewSurface != null && !isTopPreviewScrolledOff()) {
+            playActiveVideoInPreview(repository.getActiveWallpaper())
+        }
+    }
+
+    private fun playInFloatingPreview(item: WallpaperItem) {
+        currentFloatingItem = item
+        val surface = floatingSurface ?: return
+        try {
+            stopFloatingPlayback()
+            floatingPlayer = MediaPlayer().apply {
+                setSurface(surface)
+                if (item.isPreset) {
+                    val afd = resources.openRawResourceFd(item.rawResId)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                } else {
+                    val file = File(item.filePath)
+                    if (file.exists() && file.length() > 0) {
+                        if (VaultSecurityManager.isScrambled(file)) {
+                            val playerMds = VaultSecurityManager.createMediaDataSource(file)
+                            setDataSource(playerMds)
+                        } else {
+                            setDataSource(item.filePath)
+                        }
+                    } else if (item.videoUrl.isNotBlank()) {
+                        setDataSource(this@MainActivity, Uri.parse(item.videoUrl))
+                    }
+                }
+                isLooping = true
+                val isMute = prefs.getBoolean(VideoWallpaperService.KEY_MUTE, true)
+                val vol = if (isMute) 0f else 1f
+                setVolume(vol, vol)
+                setOnPreparedListener { mp ->
+                    try {
+                        mp.start()
+                    } catch (_: Exception) {}
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to play floating preview: ${e.message}")
+        }
+    }
+
+    private fun stopFloatingPlayback() {
+        val player = floatingPlayer ?: return
+        floatingPlayer = null
+        try {
+            player.setOnPreparedListener(null)
+            player.reset()
+            player.release()
+        } catch (_: Exception) {}
     }
 
     private fun loadStoreCatalog() {
@@ -1106,6 +1357,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 storeAdapter.finishDownload(updated)
                 refreshGallery()
                 selectWallpaper(updated)
+                if (isTopPreviewScrolledOff()) {
+                    showFloatingPreview(updated)
+                }
                 // Silent download - no toast alert as requested
                 analytics.logAction("download_success", "SUCCESS", duration, mapOf(
                     "id" to item.id,
@@ -1542,8 +1796,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             }
                         }
 
-                        // Immediately begin live video streaming in the preview mockup
-                        playStreamingVideoInPreview(targetItem)
+                        // If downloaded, immediately begin live video preview in mockup
+                        if (targetItem.isDownloaded) {
+                            playActiveVideoInPreview(targetItem)
+                        }
 
                         // Smoothly scroll NestedScrollView directly down to the wallpaper card
                         nestedScrollViewMain.postDelayed({
@@ -1566,7 +1822,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                                 val targetY = layoutExploreStore.top + (targetIndex * approxCardHeight)
                                 nestedScrollViewMain.smoothScrollTo(0, targetY)
                             }
-                            showGlassToast("Previewing '${targetItem.title}'", isSuccess = true)
+                            if (targetItem.isDownloaded) {
+                                if (isTopPreviewScrolledOff()) {
+                                    showFloatingPreview(targetItem)
+                                }
+                                showGlassToast("Previewing '${targetItem.title}'", isSuccess = true)
+                            } else {
+                                showGlassToast("Found '${targetItem.title}' • Tap Download below", isSuccess = true)
+                            }
                         }, 350)
                     }
                 }
@@ -2508,12 +2771,14 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             unregisterReceiver(notifReceiver)
         } catch (_: Exception) {}
         stopPreviewPlayback()
+        stopFloatingPlayback()
         analytics.flushSync()
         super.onPause()
     }
 
     override fun onDestroy() {
         stopPreviewPlayback()
+        stopFloatingPlayback()
         analytics.flushSync()
         super.onDestroy()
     }
