@@ -136,7 +136,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var tvFloatingPreviewTitle: TextView
     private lateinit var tvFloatingMockNotificationText: TextView
     private lateinit var tvFloatingWallpaperDesc: TextView
-    private lateinit var btnFloatingPreviewClose: FrameLayout
     private lateinit var btnFloatingPreviewCollapse: View
     private lateinit var btnFloatingPreviewApply: MaterialButton
 
@@ -800,7 +799,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvFloatingPreviewTitle = findViewById(R.id.tvFloatingPreviewTitle)
         tvFloatingMockNotificationText = findViewById(R.id.tvFloatingMockNotificationText)
         tvFloatingWallpaperDesc = findViewById(R.id.tvFloatingWallpaperDesc)
-        btnFloatingPreviewClose = findViewById(R.id.btnFloatingPreviewClose)
         btnFloatingPreviewCollapse = findViewById(R.id.btnFloatingPreviewCollapse)
         btnFloatingPreviewApply = findViewById(R.id.btnFloatingPreviewApply)
 
@@ -834,11 +832,6 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 repository.getActiveWallpaper()
             }
             showFloatingPreview(itemToPreview)
-        }
-
-        btnFloatingPreviewClose.setOnClickListener {
-            isFloatingPreviewDismissedByUser = true
-            hideFloatingPreview()
         }
 
         btnFloatingPreviewCollapse.setOnClickListener {
@@ -927,7 +920,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         currentFloatingItem = item
         tvFloatingPreviewTitle.text = item.title
         tvFloatingMockNotificationText.text = "${item.title} • Preview"
-        tvFloatingWallpaperDesc.text = item.description.ifBlank { "4K animated loop lock screen wallpaper." }
+        
+        // Graceful character limit to prevent layout overcrowding
+        val desc = item.description.ifBlank { "4K animated loop lock screen wallpaper." }
+        tvFloatingWallpaperDesc.text = if (desc.length > 26) desc.take(26) + "..." else desc
 
         // Stop top preview playback to preserve hardware decoding resources & prevent audio overlap
         stopPreviewPlayback()
@@ -936,15 +932,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         if (layoutFloatingPreviewOverlay.visibility != View.VISIBLE) {
             layoutFloatingPreviewOverlay.alpha = 0f
             layoutFloatingPreviewOverlay.visibility = View.VISIBLE
-            // Slide down smoothly from the top and dock there
-            cardFloatingPreview.translationY = -600f
+            
+            // Ultra-smooth slide from top
+            val slideDist = if (cardFloatingPreview.height > 0) -cardFloatingPreview.height.toFloat() else -(340 * resources.displayMetrics.density)
+            cardFloatingPreview.translationY = slideDist
             cardFloatingPreview.alpha = 0.3f
-            layoutFloatingPreviewOverlay.animate().alpha(1f).setDuration(220).start()
+            
+            layoutFloatingPreviewOverlay.animate().alpha(1f).setDuration(260).start()
             cardFloatingPreview.animate()
                 .translationY(0f)
                 .alpha(1f)
-                .setDuration(280)
-                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setDuration(340)
+                .setInterpolator(android.view.animation.DecelerateInterpolator(1.8f))
                 .start()
         }
 
@@ -958,16 +957,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         stopFloatingPlayback()
         currentFloatingItem = null
 
-        // Slide back up to the top and fade out
+        // Ultra-smooth slide back up to top
+        val slideDist = if (cardFloatingPreview.height > 0) -cardFloatingPreview.height.toFloat() else -(340 * resources.displayMetrics.density)
         cardFloatingPreview.animate()
-            .translationY(-600f)
+            .translationY(slideDist)
             .alpha(0f)
-            .setDuration(200)
+            .setDuration(280)
+            .setInterpolator(android.view.animation.AccelerateInterpolator(1.5f))
             .start()
 
         layoutFloatingPreviewOverlay.animate()
             .alpha(0f)
-            .setDuration(200)
+            .setDuration(280)
             .withEndAction {
                 layoutFloatingPreviewOverlay.visibility = View.GONE
                 checkFloatingButtonVisibility()
