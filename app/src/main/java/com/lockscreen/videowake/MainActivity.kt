@@ -56,6 +56,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -71,6 +72,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
@@ -82,6 +84,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var tvUserAuthText: TextView
     private lateinit var ivUserAuthPhoto: ImageView
     private lateinit var tvUserAuthInitial: TextView
+    private var cachedAvatarBitmap: Bitmap? = null
 
     private lateinit var tvDeviceBrand: TextView
     private lateinit var tvPrimaryInstruction: TextView
@@ -403,11 +406,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                     }
 
                     if (user != null) {
+                        val photoUrl = getEffectiveUserPhotoUrl(user) ?: user.photoUrl?.toString() ?: ""
                         analytics.linkUserToDevice(
                             user.uid,
                             user.email ?: "",
                             user.displayName ?: "",
-                            user.photoUrl?.toString() ?: ""
+                            photoUrl
                         )
                     }
                     val name = user?.displayName ?: "User"
@@ -548,6 +552,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         setupTabSwitching()
         setupListeners()
         setupHeaderControls()
+        preloadCachedAvatar()
 
         checkNotificationPermission()
         syncInAppNotifications()
@@ -1461,6 +1466,56 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private fun getAvatarCacheFile(): File = File(filesDir, "cached_user_avatar.png")
+
+    private fun preloadCachedAvatar() {
+        if (cachedAvatarBitmap != null) return
+        try {
+            val file = getAvatarCacheFile()
+            if (file.exists() && file.length() > 0) {
+                cachedAvatarBitmap = BitmapFactory.decodeFile(file.absolutePath)
+                if (cachedAvatarBitmap != null) {
+                    ivUserAuthPhoto.setImageBitmap(cachedAvatarBitmap)
+                    ivUserAuthPhoto.visibility = View.VISIBLE
+                    tvUserAuthInitial.visibility = View.GONE
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Failed to preload avatar cache: ${e.message}")
+        }
+    }
+
+    private fun clearCachedUserAvatar() {
+        cachedAvatarBitmap = null
+        try {
+            val file = getAvatarCacheFile()
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (_: Exception) {}
+        prefs.edit().remove("cached_user_photo_url").apply()
+    }
+
+    private fun getEffectiveUserPhotoUrl(user: FirebaseUser? = null): String? {
+        val targetUser = user ?: authManager.currentUser
+        val direct = authManager.getEffectivePhotoUrl()
+        if (!direct.isNullOrBlank()) return direct
+
+        val userPhoto = targetUser?.photoUrl?.toString()
+        if (!userPhoto.isNullOrBlank()) return userPhoto
+
+        val providerPhoto = targetUser?.providerData?.firstNotNullOfOrNull { it.photoUrl?.toString() }
+        if (!providerPhoto.isNullOrBlank()) return providerPhoto
+
+        val analyticsPhoto = analytics.getUserPhoto()
+        if (!analyticsPhoto.isNullOrBlank()) return analyticsPhoto
+
+        val prefPhoto = prefs.getString("cached_user_photo_url", null)
+        if (!prefPhoto.isNullOrBlank()) return prefPhoto
+
+        return null
+    }
+
     private fun loadProfileAvatar(
         photoUrl: String?,
         displayName: String?,
@@ -1470,41 +1525,91 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         val initial = (displayName?.takeIf { it.isNotBlank() } ?: "U").first().uppercase()
         fallbackInitial.text = initial
 
-        if (photoUrl.isNullOrBlank()) {
-            imageView.visibility = View.GONE
-            fallbackInitial.visibility = View.VISIBLE
+        val effectiveUrl = photoUrl ?: getEffectiveUserPhotoUrl()
+
+        // 1. If memory cached bitmap is available, render immediately
+        if (cachedAvatarBitmap != null) {
+            imageView.setImageBitmap(cachedAvatarBitmap)
+            imageView.visibility = View.VISIBLE
+            fallbackInitial.visibility = View.GONE
+        } else {
+            // 2. Try disk cache synchronously before any network attempt
+            val cacheFile = getAvatarCacheFile()
+            if (cacheFile.exists() && cacheFile.length() > 0) {
+                val diskBitmap = try {
+                    BitmapFactory.decodeFile(cacheFile.absolutePath)
+                } catch (e: Exception) {
+                    null
+                }
+                if (diskBitmap != null) {
+                    cachedAvatarBitmap = diskBitmap
+                    imageView.setImageBitmap(diskBitmap)
+                    imageView.visibility = View.VISIBLE
+                    fallbackInitial.visibility = View.GONE
+                } else {
+                    imageView.visibility = View.GONE
+                    fallbackInitial.visibility = View.VISIBLE
+                }
+            } else {
+                imageView.visibility = View.GONE
+                fallbackInitial.visibility = View.VISIBLE
+            }
+        }
+
+        if (effectiveUrl.isNullOrBlank()) {
             return
         }
 
-        // Show fallback letter initially while image loads in background
-        imageView.visibility = View.GONE
-        fallbackInitial.visibility = View.VISIBLE
-
+        // 3. Background fetch with OkHttpClient
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
-                val request = Request.Builder().url(photoUrl).build()
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(12, TimeUnit.SECONDS)
+                    .readTimeout(18, TimeUnit.SECONDS)
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .build()
+
+                val request = Request.Builder()
+                    .url(effectiveUrl)
+                    .header("User-Agent", "VideoLock/1.0 (Android; Google-Avatar-Sync)")
+                    .build()
+
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         val bytes = response.body?.bytes()
                         if (bytes != null && bytes.isNotEmpty()) {
                             val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                            withContext(Dispatchers.Main) {
-                                if (!isFinishing && !isDestroyed) {
-                                    imageView.setImageBitmap(bitmap)
-                                    imageView.visibility = View.VISIBLE
-                                    fallbackInitial.visibility = View.GONE
+                            if (bitmap != null) {
+                                cachedAvatarBitmap = bitmap
+                                try {
+                                    val file = getAvatarCacheFile()
+                                    FileOutputStream(file).use { fos ->
+                                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+                                    }
+                                    prefs.edit().putString("cached_user_photo_url", effectiveUrl).apply()
+                                } catch (e: Exception) {
+                                    Log.w("MainActivity", "Failed to cache avatar to file: ${e.message}")
                                 }
+
+                                withContext(Dispatchers.Main) {
+                                    if (!isFinishing && !isDestroyed) {
+                                        imageView.setImageBitmap(bitmap)
+                                        imageView.visibility = View.VISIBLE
+                                        fallbackInitial.visibility = View.GONE
+                                    }
+                                }
+                                return@launch
                             }
-                            return@launch
                         }
                     }
                 }
             } catch (e: Exception) {
-                // If offline or network issue, fallback initial remains visible
+                Log.w("MainActivity", "Avatar fetch error: ${e.message}")
             }
+
             withContext(Dispatchers.Main) {
-                if (!isFinishing && !isDestroyed && imageView.drawable == null) {
+                if (!isFinishing && !isDestroyed && cachedAvatarBitmap == null && imageView.drawable == null) {
                     imageView.visibility = View.GONE
                     fallbackInitial.visibility = View.VISIBLE
                 }
@@ -1532,7 +1637,27 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvName.text = name
         tvEmail.text = email
 
-        loadProfileAvatar(user.photoUrl?.toString(), name, ivAvatar, tvInitial)
+        val effectivePhoto = getEffectiveUserPhotoUrl(user)
+
+        // Instant avatar binding from memory or disk cache to eliminate initial letter flicker
+        if (cachedAvatarBitmap != null) {
+            ivAvatar.setImageBitmap(cachedAvatarBitmap)
+            ivAvatar.visibility = View.VISIBLE
+            tvInitial.visibility = View.GONE
+        } else {
+            val cacheFile = getAvatarCacheFile()
+            if (cacheFile.exists() && cacheFile.length() > 0) {
+                val diskBitmap = try { BitmapFactory.decodeFile(cacheFile.absolutePath) } catch (_: Exception) { null }
+                if (diskBitmap != null) {
+                    cachedAvatarBitmap = diskBitmap
+                    ivAvatar.setImageBitmap(diskBitmap)
+                    ivAvatar.visibility = View.VISIBLE
+                    tvInitial.visibility = View.GONE
+                }
+            }
+        }
+
+        loadProfileAvatar(effectivePhoto, name, ivAvatar, tvInitial)
 
         val assignedCount = prefs.getStringSet("assigned_wallpaper_ids", emptySet())?.size ?: 0
         tvAssigned.text = if (assignedCount > 0) "$assignedCount Assigned" else "0 Assigned (Public Catalog)"
@@ -1544,6 +1669,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         btnSwitch.setOnClickListener {
             dialog.dismiss()
             val start = System.currentTimeMillis()
+            clearCachedUserAvatar()
             VaultSecurityManager.performSelectiveLogoutPurge(this@MainActivity)
             authManager.signOut {
                 analytics.linkUserToDevice("", "")
@@ -1571,6 +1697,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 .setPositiveButton("Sign Out") { _, _ ->
                     dialog.dismiss()
                     val start = System.currentTimeMillis()
+                    clearCachedUserAvatar()
                     VaultSecurityManager.performSelectiveLogoutPurge(this@MainActivity)
                     authManager.signOut {
                         analytics.linkUserToDevice("", "")
@@ -1615,17 +1742,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             val displayName = user.displayName ?: user.email?.substringBefore("@") ?: "User"
             val email = user.email ?: ""
             val firstName = displayName.split(" ").firstOrNull() ?: displayName
+            val photoUrl = getEffectiveUserPhotoUrl(user)
 
             // Header Pill Button
             tvUserAuthText.text = firstName
             ivUserAuthIcon.visibility = View.GONE
-            loadProfileAvatar(user.photoUrl?.toString(), displayName, ivUserAuthPhoto, tvUserAuthInitial)
+            loadProfileAvatar(photoUrl, displayName, ivUserAuthPhoto, tvUserAuthInitial)
 
             analytics.linkUserToDevice(
                 user.uid,
                 email,
                 displayName,
-                user.photoUrl?.toString() ?: ""
+                photoUrl ?: ""
             )
             // Listen to real-time wallpaper assignments from admin
             authManager.listenToAssignedWallpapers { assignedList ->
@@ -1641,6 +1769,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             ivUserAuthIcon.visibility = View.VISIBLE
             ivUserAuthPhoto.visibility = View.GONE
             tvUserAuthInitial.visibility = View.GONE
+            cachedAvatarBitmap = null
         }
     }
 

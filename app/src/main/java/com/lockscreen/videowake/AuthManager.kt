@@ -36,6 +36,26 @@ class AuthManager(private val context: Context) {
     val isUserSignedIn: Boolean
         get() = auth.currentUser != null
 
+    var lastGooglePhotoUrl: String? = null
+        private set
+
+    fun getEffectivePhotoUrl(): String? {
+        val direct = currentUser?.photoUrl?.toString()
+        if (!direct.isNullOrBlank()) return direct
+
+        val providerPhoto = currentUser?.providerData?.firstNotNullOfOrNull { it.photoUrl?.toString() }
+        if (!providerPhoto.isNullOrBlank()) return providerPhoto
+
+        if (!lastGooglePhotoUrl.isNullOrBlank()) return lastGooglePhotoUrl
+
+        try {
+            val lastAcct = GoogleSignIn.getLastSignedInAccount(context)?.photoUrl?.toString()
+            if (!lastAcct.isNullOrBlank()) return lastAcct
+        } catch (_: Exception) {}
+
+        return null
+    }
+
     private val googleSignInClient: GoogleSignInClient by lazy {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(WEB_CLIENT_ID)
@@ -70,6 +90,8 @@ class AuthManager(private val context: Context) {
                 }
                 return Result.failure(Exception(friendlyMessage, apiEx))
             } ?: return Result.failure(Exception("Google Sign-In returned empty account"))
+
+            lastGooglePhotoUrl = account.photoUrl?.toString()
 
             val idToken = account.idToken
                 ?: return Result.failure(Exception("Google ID Token is missing from Google account."))
@@ -141,6 +163,7 @@ class AuthManager(private val context: Context) {
     fun signOut(onComplete: () -> Unit) {
         assignmentListener?.remove()
         assignmentListener = null
+        lastGooglePhotoUrl = null
         auth.signOut()
         googleSignInClient.signOut().addOnCompleteListener {
             onComplete()
