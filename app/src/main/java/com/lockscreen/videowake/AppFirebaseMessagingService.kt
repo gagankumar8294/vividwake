@@ -87,6 +87,13 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
 
+            try {
+                val appIcon = BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
+                if (appIcon != null) {
+                    notificationBuilder.setLargeIcon(appIcon)
+                }
+            } catch (_: Exception) {}
+
             if (bannerBitmap != null) {
                 notificationBuilder.setStyle(
                     NotificationCompat.BigPictureStyle()
