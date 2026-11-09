@@ -133,7 +133,7 @@ class InAppNotificationManager(private val context: Context) {
     suspend fun syncWithServer(
         userEmail: String?,
         userId: String?,
-        showSystemAlertOnNew: Boolean = true
+        showSystemAlertOnNew: Boolean = false
     ): Int = withContext(Dispatchers.IO) {
         val client = OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
@@ -198,6 +198,9 @@ class InAppNotificationManager(private val context: Context) {
             if (!existingIds.contains(cloudNotif.id)) {
                 currentLocal.add(0, cloudNotif)
                 newCount++
+                // Mobile status bar alert commented out per user specification:
+                // Only in-app notification center is active
+                /*
                 if (showSystemAlertOnNew) {
                     try {
                         AppFirebaseMessagingService.showSystemNotification(
@@ -211,6 +214,7 @@ class InAppNotificationManager(private val context: Context) {
                         Log.w("InAppNotifMgr", "Could not show system notification alert: ${e.message}")
                     }
                 }
+                */
             }
         }
 

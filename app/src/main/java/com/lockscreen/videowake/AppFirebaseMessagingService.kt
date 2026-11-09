@@ -137,16 +137,18 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
 
         val notificationManager = InAppNotificationManager(applicationContext)
 
-        // 1. If in_app or both, save to In-App Notification Center
-        if (deliveryType == "in_app" || deliveryType == "both") {
-            notificationManager.addNotification(title, body, wallpaperId, imageUrl)
-            // Broadcast intent to update UI badge in MainActivity if running
-            sendBroadcast(Intent(ACTION_NEW_INAPP_NOTIFICATION).setPackage(packageName))
-        }
+        // 1. Always save to In-App Notification Center (Pure In-App Notifications)
+        notificationManager.addNotification(title, body, wallpaperId, imageUrl)
+        
+        // Broadcast intent to update UI badge in MainActivity in real-time if app is foregrounded
+        sendBroadcast(Intent(ACTION_NEW_INAPP_NOTIFICATION).setPackage(packageName))
 
-        // 2. If system or both, show Android Status Bar Notification with Matching Banner Image
+        // 2. Mobile/System status-bar notification commented out per user specification:
+        // Pure in-app notification center only (no system status bar or pull-down tray alerts)
+        /*
         if (deliveryType == "system" || deliveryType == "both") {
             showSystemNotification(applicationContext, title, body, wallpaperId, imageUrl)
         }
+        */
     }
 }

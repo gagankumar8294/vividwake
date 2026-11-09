@@ -37,20 +37,10 @@
             android:layout_height="wrap_content"
             android:background="?attr/selectableItemBackground"
             android:padding="6dp"
-            android:layout_marginEnd="6dp"
             android:text="Mark all read"
             android:textColor="#A78BFA"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/btnClearAllNotifs"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="?attr/selectableItemBackground"
-            android:padding="6dp"
-            android:text="Clear All"
-            android:textColor="#888899"
-            android:textSize="12sp" />
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
     </LinearLayout>
 

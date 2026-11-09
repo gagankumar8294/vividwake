@@ -247,11 +247,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
+        // Mobile system status bar notifications are disabled (pure in-app notification center).
+        // No runtime POST_NOTIFICATIONS permission prompt required.
     }
 
     private fun syncInAppNotifications() {
@@ -261,7 +258,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 val newCount = inAppNotificationManager.syncWithServer(
                     userEmail = user?.email,
                     userId = user?.uid,
-                    showSystemAlertOnNew = true
+                    showSystemAlertOnNew = false
                 )
                 withContext(Dispatchers.Main) {
                     updateNotificationBadge()
@@ -1374,8 +1371,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
         val rv = view.findViewById<RecyclerView>(R.id.rvInAppNotifs)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEmptyNotifs)
-        val btnClear = view.findViewById<TextView>(R.id.btnClearAllNotifs)
         val btnMarkAll = view.findViewById<TextView>(R.id.btnMarkAllRead)
+
+        var notifAdapter: InAppNotificationAdapter? = null
 
         fun renderList() {
             val list = inAppNotificationManager.getNotifications()
@@ -1385,31 +1383,33 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             } else {
                 tvEmpty.visibility = View.GONE
                 rv.visibility = View.VISIBLE
-                rv.layoutManager = LinearLayoutManager(this)
-                val notifAdapter = InAppNotificationAdapter(list) { notif ->
-                    val clickStart = System.currentTimeMillis()
-                    // 1. Mark this specific notification as read in persistent storage
-                    inAppNotificationManager.markAsRead(notif.id)
-                    notif.isRead = true
+                if (notifAdapter == null) {
+                    rv.layoutManager = LinearLayoutManager(this)
+                    notifAdapter = InAppNotificationAdapter(list) { notif ->
+                        val clickStart = System.currentTimeMillis()
+                        // 1. Mark this specific notification as read in persistent storage
+                        inAppNotificationManager.markAsRead(notif.id)
+                        notif.isRead = true
 
-                    // 2. Immediately update unread badge on top bar
-                    updateNotificationBadge()
+                        // 2. Immediately update unread badge on top bar
+                        updateNotificationBadge()
 
-                    // 3. Log real-time analytics event for Admin Dashboard
-                    analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
-                        "notifId" to notif.id,
-                        "title" to notif.title,
-                        "wallpaperId" to (notif.wallpaperId ?: ""),
-                        "target" to notif.title
-                    ))
-                    analytics.flushSync()
+                        // 3. Log real-time analytics event for Admin Dashboard
+                        analytics.logAction("notification_item_clicked", "SUCCESS", System.currentTimeMillis() - clickStart, mapOf(
+                            "notifId" to notif.id,
+                            "title" to notif.title,
+                            "wallpaperId" to (notif.wallpaperId ?: ""),
+                            "target" to notif.title
+                        ))
+                        analytics.flushSync()
 
-                    dialog.dismiss()
-                    if (!notif.wallpaperId.isNullOrBlank()) {
-                        switchToStoreTab()
+                        dialog.dismiss()
+                        navigateToWallpaper(notif.wallpaperId)
                     }
+                    rv.adapter = notifAdapter
+                } else {
+                    notifAdapter?.updateNotifications(list)
                 }
-                rv.adapter = notifAdapter
             }
         }
 
@@ -1441,18 +1441,52 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             analytics.flushSync()
         }
 
-        btnClear.setOnClickListener {
-            val clearStart = System.currentTimeMillis()
-            val cleared = inAppNotificationManager.getNotifications().size
-            inAppNotificationManager.clearAll()
-            analytics.logAction("notification_clear_all_clicked", "SUCCESS", System.currentTimeMillis() - clearStart, mapOf("clearedCount" to cleared))
-            analytics.flushSync()
-            updateNotificationBadge()
-            dialog.dismiss()
-        }
-
         updateNotificationBadge()
         dialog.show()
+    }
+
+    private fun navigateToWallpaper(wallpaperId: String?) {
+        if (wallpaperId.isNullOrBlank()) {
+            switchToStoreTab()
+            return
+        }
+
+        // 1. Check local wallpapers first (presets and user-downloaded)
+        val allLocal = repository.getAllWallpapers()
+        val localItem = allLocal.find {
+            it.id.equals(wallpaperId, ignoreCase = true) ||
+            it.title.equals(wallpaperId, ignoreCase = true) ||
+            it.id.contains(wallpaperId, ignoreCase = true)
+        }
+
+        if (localItem != null) {
+            switchToMyWallpapersTab()
+            selectWallpaper(localItem)
+            val pos = allLocal.indexOfFirst { it.id == localItem.id }
+            if (pos >= 0) {
+                rvWallpapers.smoothScrollToPosition(pos)
+            }
+            showGlassToast("Playing '${localItem.title}'", isSuccess = true)
+            return
+        }
+
+        // 2. Otherwise navigate to Explore Store
+        switchToStoreTab()
+        lifecycleScope.launch {
+            var attempts = 0
+            while (filteredCatalogList.isEmpty() && attempts < 15) {
+                kotlinx.coroutines.delay(200)
+                attempts++
+            }
+            val storePos = filteredCatalogList.indexOfFirst {
+                it.id.equals(wallpaperId, ignoreCase = true) ||
+                it.title.contains(wallpaperId, ignoreCase = true)
+            }
+            if (storePos >= 0) {
+                rvStoreWallpapers.smoothScrollToPosition(storePos)
+                showGlassToast("Found in Explore Store!", isSuccess = true)
+            }
+        }
     }
 
     private fun refreshGallery() {
