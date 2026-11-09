@@ -11,7 +11,8 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#0E0B16"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:descendantFocusability="blocksDescendants">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -873,7 +874,7 @@
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
 
-    <!-- Floating "Preview Video" Pill Button (Horizontally centered at TOP, animated) -->
+    <!-- Floating "Preview Video" Pill Button (Commented out per user request)
     <LinearLayout
         android:id="@+id/layoutFloatingPreviewBtnWrapper"
         android:layout_width="wrap_content"
@@ -913,6 +914,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
+    -->
 
     <!-- Floating Video Preview Dock (Full width, rounded bottom corners, no dim backdrop so records below scroll freely) -->
     <FrameLayout

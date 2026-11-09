@@ -241,6 +241,7 @@ class StoreWallpaperAdapter(
         private val tvNotificationBadge: TextView? = itemView.findViewById(R.id.tvStoreNotificationBadge)
         private val btnDownload: MaterialButton = itemView.findViewById(R.id.btnStoreDownload)
         private val btnApply: MaterialButton = itemView.findViewById(R.id.btnStoreApply)
+        private val btnPreview: MaterialButton = itemView.findViewById(R.id.btnStorePreview)
         private val btnDeleteLocal: MaterialButton = itemView.findViewById(R.id.btnStoreDeleteLocal)
 
         private var thumbJob: Job? = null
@@ -306,6 +307,7 @@ class StoreWallpaperAdapter(
                 tvProgress.text = "Downloading $currentProgress%..."
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.GONE
+                btnPreview.visibility = View.GONE
                 btnDeleteLocal.visibility = View.GONE
             } else if (item.isDownloaded) {
                 pbDownload.visibility = View.GONE
@@ -313,13 +315,15 @@ class StoreWallpaperAdapter(
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.VISIBLE
                 btnApply.text = "Select"
+                btnPreview.visibility = View.VISIBLE
                 btnDeleteLocal.visibility = View.VISIBLE
             } else {
                 pbDownload.visibility = View.GONE
                 tvProgress.visibility = View.GONE
                 btnDownload.visibility = View.VISIBLE
-                btnDownload.text = if (item.sizeDisplay.isNotBlank()) "Download (${item.sizeDisplay})" else "Download"
+                btnDownload.text = "Download"
                 btnApply.visibility = View.GONE
+                btnPreview.visibility = View.VISIBLE
                 btnDeleteLocal.visibility = View.GONE
             }
 
@@ -337,6 +341,11 @@ class StoreWallpaperAdapter(
 
             btnApply.setOnClickListener {
                 onApply(item)
+            }
+
+            btnPreview.setOnClickListener {
+                selectWallpaper(item.id)
+                onPreview(item)
             }
 
             btnDeleteLocal.setOnClickListener {

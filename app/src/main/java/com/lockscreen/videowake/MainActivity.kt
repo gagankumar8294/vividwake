@@ -128,8 +128,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private var notificationFocusJob: Job? = null
 
     // Floating Video Preview & Centered Pill Button Components
-    private lateinit var layoutFloatingPreviewBtnWrapper: View
-    private lateinit var btnFloatingPreview: View
+    // private lateinit var layoutFloatingPreviewBtnWrapper: View
+    // private lateinit var btnFloatingPreview: View
     private lateinit var layoutFloatingPreviewOverlay: FrameLayout
     private lateinit var cardFloatingPreview: MaterialCardView
     private lateinit var floatingPreviewTextureView: TextureView
@@ -750,12 +750,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             context = this,
             scope = lifecycleScope,
             onPreview = { item ->
-                if (item.isDownloaded) {
-                    selectWallpaper(item)
-                    if (isTopPreviewScrolledOff() || (::layoutFloatingPreviewOverlay.isInitialized && layoutFloatingPreviewOverlay.visibility == View.VISIBLE)) {
-                        showFloatingPreview(item)
-                    }
-                }
+                showFloatingPreview(item)
             },
             onDownload = { item ->
                 downloadCloudWallpaper(item)
@@ -791,8 +786,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun setupFloatingPreviewControls() {
-        layoutFloatingPreviewBtnWrapper = findViewById(R.id.layoutFloatingPreviewBtnWrapper)
-        btnFloatingPreview = findViewById(R.id.btnFloatingPreview)
+        // Floating preview center button commented out per user request
+        // layoutFloatingPreviewBtnWrapper = findViewById(R.id.layoutFloatingPreviewBtnWrapper)
+        // btnFloatingPreview = findViewById(R.id.btnFloatingPreview)
         layoutFloatingPreviewOverlay = findViewById(R.id.layoutFloatingPreviewOverlay)
         cardFloatingPreview = findViewById(R.id.cardFloatingPreview)
         floatingPreviewTextureView = findViewById(R.id.floatingPreviewTextureView)
@@ -822,17 +818,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
         }
 
-        btnFloatingPreview.setOnClickListener {
-            isFloatingPreviewDismissedByUser = false
-            val selectedId = storeAdapter.getSelectedWallpaperId()
-            val itemToPreview = if (!selectedId.isNullOrBlank()) {
-                fullCatalogList.find { it.id.equals(selectedId, ignoreCase = true) || (it.cloudId.isNotBlank() && it.cloudId.equals(selectedId, ignoreCase = true)) }
-                    ?: repository.getActiveWallpaper()
-            } else {
-                repository.getActiveWallpaper()
-            }
-            showFloatingPreview(itemToPreview)
-        }
+        // btnFloatingPreview listener commented out per user request
 
         btnFloatingPreviewCollapse.setOnClickListener {
             isFloatingPreviewDismissedByUser = true
@@ -862,56 +848,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     private fun checkFloatingButtonVisibility() {
-        if (!::layoutFloatingPreviewOverlay.isInitialized || !::layoutFloatingPreviewBtnWrapper.isInitialized) return
-
-        val isScrolledOff = isTopPreviewScrolledOff()
-
-        if (isScrolledOff) {
-            // If the floating preview dock is open, keep it open while scrolling!
-            if (layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
-                hideFloatingButton(animate = false)
-            } else if (!isFloatingPreviewDismissedByUser) {
-                showFloatingButton()
-            } else {
-                showFloatingButton()
-            }
-        } else {
-            hideFloatingButton(animate = true)
-            if (layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
-                hideFloatingPreview()
-            }
-        }
+        // Floating preview center button commented out per user request
     }
 
     private fun showFloatingButton() {
-        if (!::layoutFloatingPreviewBtnWrapper.isInitialized) return
-        if (layoutFloatingPreviewBtnWrapper.visibility == View.VISIBLE) return
-        layoutFloatingPreviewBtnWrapper.visibility = View.VISIBLE
-        layoutFloatingPreviewBtnWrapper.alpha = 0f
-        layoutFloatingPreviewBtnWrapper.translationY = -60f
-        layoutFloatingPreviewBtnWrapper.animate()
-            .alpha(1f)
-            .translationY(0f)
-            .setDuration(240)
-            .setInterpolator(android.view.animation.DecelerateInterpolator())
-            .start()
+        // Floating preview center button commented out per user request
     }
 
     private fun hideFloatingButton(animate: Boolean = true) {
-        if (!::layoutFloatingPreviewBtnWrapper.isInitialized) return
-        if (layoutFloatingPreviewBtnWrapper.visibility != View.VISIBLE) return
-        if (animate) {
-            layoutFloatingPreviewBtnWrapper.animate()
-                .alpha(0f)
-                .translationY(-60f)
-                .setDuration(180)
-                .withEndAction {
-                    layoutFloatingPreviewBtnWrapper.visibility = View.GONE
-                }
-                .start()
-        } else {
-            layoutFloatingPreviewBtnWrapper.visibility = View.GONE
-        }
+        // Floating preview center button commented out per user request
     }
 
     private fun showFloatingPreview(item: WallpaperItem) {

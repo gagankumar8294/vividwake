@@ -211,7 +211,7 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <!-- Download Button -->
+                <!-- Download Button (Shown when not downloaded) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStoreDownload"
                     android:layout_width="0dp"
@@ -219,14 +219,18 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
                     android:text="Download"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
-                    android:textSize="12sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
                     app:backgroundTint="#D4AF37"
                     app:cornerRadius="8dp"
                     app:icon="@drawable/ic_download"
+                    app:iconSize="14dp"
+                    app:iconPadding="4dp"
                     app:iconTint="#0E0B16" />
 
                 <!-- Select Button (Only when downloaded) -->
@@ -237,16 +241,45 @@
                     android:layout_weight="1"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
                     android:text="Select"
                     android:textAllCaps="false"
                     android:textColor="#0E0B16"
-                    android:textSize="12sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
                     app:backgroundTint="#22C55E"
                     app:cornerRadius="8dp"
                     app:icon="@drawable/ic_check"
+                    app:iconSize="14dp"
+                    app:iconPadding="4dp"
                     app:iconTint="#0E0B16"
                     android:visibility="gone" />
+
+                <!-- Preview Button (Available both when undownloaded and downloaded) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStorePreview"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:text="Preview"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#2D2245"
+                    app:strokeColor="#64508A"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_play"
+                    app:iconSize="14dp"
+                    app:iconPadding="4dp"
+                    app:iconTint="#D4AF37" />
 
                 <!-- Delete Local Download Button (Frees phone storage) -->
                 <com.google.android.material.button.MaterialButton
