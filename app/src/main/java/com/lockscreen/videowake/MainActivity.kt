@@ -120,6 +120,12 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private lateinit var tvStoreEmptySubtitle: TextView
     private lateinit var btnResetStoreFilters: MaterialButton
 
+    // Notification Drop Focus Banner
+    private lateinit var layoutNotificationFocusBanner: LinearLayout
+    private lateinit var tvNotificationFocusText: TextView
+    private lateinit var btnDismissNotificationFocus: MaterialButton
+    private var notificationFocusJob: Job? = null
+
     private var isGiftedFilterActive: Boolean = false
     private var isSearchExpanded: Boolean = false
 
@@ -492,6 +498,15 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvStoreEmptyTitle = findViewById(R.id.tvStoreEmptyTitle)
         tvStoreEmptySubtitle = findViewById(R.id.tvStoreEmptySubtitle)
         btnResetStoreFilters = findViewById(R.id.btnResetStoreFilters)
+
+        layoutNotificationFocusBanner = findViewById(R.id.layoutNotificationFocusBanner)
+        tvNotificationFocusText = findViewById(R.id.tvNotificationFocusText)
+        btnDismissNotificationFocus = findViewById(R.id.btnDismissNotificationFocus)
+        btnDismissNotificationFocus.setOnClickListener {
+            notificationFocusJob?.cancel()
+            storeAdapter.clearFocusMode()
+            layoutNotificationFocusBanner.visibility = View.GONE
+        }
 
         btnSetWallpaper = findViewById(R.id.btnSetWallpaper)
         btnDirectGalleryHandOff = findViewById(R.id.btnDirectGalleryHandOff)
@@ -1511,8 +1526,21 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             currentStorePage = (neededCount / STORE_PAGE_SIZE) + 1
                         }
 
-                        // Prominently highlight this card and dim all other store cards
-                        storeAdapter.setHighlightedWallpaperId(targetItem.id)
+                        // Prominently highlight this card and dim other store cards in 9-second focus mode
+                        storeAdapter.setNotificationDropFocus(targetItem.id)
+
+                        layoutNotificationFocusBanner.visibility = View.VISIBLE
+                        tvNotificationFocusText.text = "✨ Viewing Notification Drop: ${targetItem.title}"
+
+                        // Auto-revert dimming after 9 seconds so user can freely move on
+                        notificationFocusJob?.cancel()
+                        notificationFocusJob = lifecycleScope.launch {
+                            kotlinx.coroutines.delay(9000)
+                            withContext(Dispatchers.Main) {
+                                storeAdapter.clearFocusMode()
+                                layoutNotificationFocusBanner.visibility = View.GONE
+                            }
+                        }
 
                         // Immediately begin live video streaming in the preview mockup
                         playStreamingVideoInPreview(targetItem)

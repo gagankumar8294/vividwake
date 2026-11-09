@@ -75,21 +75,36 @@ class StoreWallpaperAdapter(
 
     private val rows = mutableListOf<StoreRow>()
     private val downloadingProgressMap = mutableMapOf<String, Int>()
-    private var highlightedWallpaperId: String? = null
+    private var notificationDropId: String? = null
+    private var selectedWallpaperId: String? = null
+    private var isFocusMode: Boolean = false
 
-    fun setHighlightedWallpaperId(id: String?) {
-        if (highlightedWallpaperId == id) return
-        highlightedWallpaperId = id
+    fun setNotificationDropFocus(dropId: String?) {
+        notificationDropId = dropId
+        selectedWallpaperId = dropId
+        isFocusMode = !dropId.isNullOrBlank()
         notifyDataSetChanged()
     }
 
-    fun getHighlightedWallpaperId(): String? = highlightedWallpaperId
+    fun selectWallpaper(itemId: String?) {
+        selectedWallpaperId = itemId
+        notifyDataSetChanged()
+    }
 
-    fun clearHighlight() {
-        if (highlightedWallpaperId != null) {
-            highlightedWallpaperId = null
-            notifyDataSetChanged()
-        }
+    fun clearFocusMode() {
+        isFocusMode = false
+        notifyDataSetChanged()
+    }
+
+    fun isFocusModeActive(): Boolean = isFocusMode
+
+    fun getSelectedWallpaperId(): String? = selectedWallpaperId
+
+    private fun matchesId(item: WallpaperItem, query: String?): Boolean {
+        if (query.isNullOrBlank()) return false
+        return item.id.equals(query, ignoreCase = true) ||
+                item.title.equals(query, ignoreCase = true) ||
+                (item.cloudId.isNotBlank() && item.cloudId.equals(query, ignoreCase = true))
     }
 
     private fun dpToPx(dp: Float): Int {
@@ -238,36 +253,38 @@ class StoreWallpaperAdapter(
         }
 
         fun bind(item: WallpaperItem) {
-            val isHighlighted = !highlightedWallpaperId.isNullOrBlank() && (
-                item.id.equals(highlightedWallpaperId, ignoreCase = true) ||
-                item.title.contains(highlightedWallpaperId!!, ignoreCase = true) ||
-                highlightedWallpaperId!!.contains(item.title, ignoreCase = true) ||
-                (item.cloudId.isNotBlank() && item.cloudId.equals(highlightedWallpaperId, ignoreCase = true))
-            )
+            val isNotificationDrop = !notificationDropId.isNullOrBlank() && matchesId(item, notificationDropId)
+            val isSelected = !selectedWallpaperId.isNullOrBlank() && matchesId(item, selectedWallpaperId)
 
-            if (!highlightedWallpaperId.isNullOrBlank()) {
-                if (isHighlighted) {
+            // The notification drop badge ONLY shows on the actual notification drop wallpaper, NEVER on others
+            tvNotificationBadge?.visibility = if (isNotificationDrop) View.VISIBLE else View.GONE
+
+            if (isFocusMode) {
+                if (isSelected) {
                     // Prominently highlighted card: full opacity, glowing gold border, elevated background
                     card.alpha = 1.0f
                     card.strokeColor = Color.parseColor("#D4AF37")
                     card.strokeWidth = dpToPx(2.5f)
                     card.setCardBackgroundColor(Color.parseColor("#261B38"))
-                    tvNotificationBadge?.visibility = View.VISIBLE
                 } else {
                     // Non-matching cards dimmed so the target card is immediately clear to the user
                     card.alpha = 0.40f
                     card.strokeColor = Color.parseColor("#241A35")
                     card.strokeWidth = dpToPx(1f)
                     card.setCardBackgroundColor(Color.parseColor("#130F20"))
-                    tvNotificationBadge?.visibility = View.GONE
                 }
             } else {
-                // Default normal styling when no notification highlight is active
+                // Default normal styling when no focus mode is active
                 card.alpha = 1.0f
-                card.strokeColor = Color.parseColor("#3D3254")
-                card.strokeWidth = dpToPx(1f)
-                card.setCardBackgroundColor(Color.parseColor("#1A1528"))
-                tvNotificationBadge?.visibility = View.GONE
+                if (isSelected) {
+                    card.strokeColor = Color.parseColor("#D4AF37")
+                    card.strokeWidth = dpToPx(2f)
+                    card.setCardBackgroundColor(Color.parseColor("#221832"))
+                } else {
+                    card.strokeColor = Color.parseColor("#3D3254")
+                    card.strokeWidth = dpToPx(1f)
+                    card.setCardBackgroundColor(Color.parseColor("#1A1528"))
+                }
             }
 
             tvTitle.text = item.title
@@ -308,7 +325,7 @@ class StoreWallpaperAdapter(
 
             // Click anywhere on card: if downloaded, select it; if not downloaded, stream live preview
             card.setOnClickListener {
-                setHighlightedWallpaperId(item.id)
+                selectWallpaper(item.id)
                 if (item.isDownloaded) {
                     onApply(item)
                 } else {
