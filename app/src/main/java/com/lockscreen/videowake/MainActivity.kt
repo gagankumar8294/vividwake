@@ -750,7 +750,16 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             context = this,
             scope = lifecycleScope,
             onPreview = { item ->
-                showFloatingPreview(item)
+                if (isTopPreviewScrolledOff()) {
+                    showFloatingPreview(item)
+                } else {
+                    if (::layoutFloatingPreviewOverlay.isInitialized && layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
+                        hideFloatingPreview()
+                    }
+                    playActiveVideoInPreview(item)
+                    updateSubtitle(item)
+                    tvMockNotificationText?.text = "${item.title} • Preview"
+                }
             },
             onDownload = { item ->
                 downloadCloudWallpaper(item)
@@ -772,6 +781,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         // Fetch on scroll & sync floating preview button
         nestedScrollViewMain.setOnScrollChangeListener(androidx.core.widget.NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
             checkFloatingButtonVisibility()
+
+            if (!isTopPreviewScrolledOff()) {
+                // When reached the top height where direct preview is visible, smoothly close floating preview modal
+                if (::layoutFloatingPreviewOverlay.isInitialized && layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
+                    hideFloatingPreview()
+                }
+            }
 
             if (layoutExploreStore.visibility == View.VISIBLE && !isStoreLoadingMore && (currentStorePage * STORE_PAGE_SIZE < filteredCatalogList.size)) {
                 val child = v.getChildAt(0)
@@ -900,6 +916,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     private fun hideFloatingPreview() {
         if (!::layoutFloatingPreviewOverlay.isInitialized || layoutFloatingPreviewOverlay.visibility != View.VISIBLE) return
         stopFloatingPlayback()
+        val closingItem = currentFloatingItem
         currentFloatingItem = null
 
         // Ultra-smooth slide back up to top
@@ -921,7 +938,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             .start()
 
         if (previewSurface != null && !isTopPreviewScrolledOff()) {
-            playActiveVideoInPreview(repository.getActiveWallpaper())
+            val itemToPlay = closingItem ?: repository.getActiveWallpaper()
+            playActiveVideoInPreview(itemToPlay)
+            updateSubtitle(itemToPlay)
+            tvMockNotificationText?.text = "${itemToPlay.title} • Preview"
         }
     }
 
