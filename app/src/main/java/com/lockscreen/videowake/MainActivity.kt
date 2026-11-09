@@ -1799,6 +1799,11 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             if (pos >= 0) {
                 rvWallpapers.smoothScrollToPosition(pos)
             }
+            analytics.logAction("notification_deep_linked_local", "SUCCESS", 0, mapOf(
+                "wallpaperId" to localItem.id,
+                "title" to localItem.title
+            ))
+            analytics.flushSync()
             showGlassToast("Playing '${localItem.title}'", isSuccess = true)
             return
         }
@@ -1894,6 +1899,13 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                             } else {
                                 showGlassToast("Found '${targetItem.title}' • Tap Download below", isSuccess = true)
                             }
+                            analytics.logAction("notification_deep_linked_store", "SUCCESS", 0, mapOf(
+                                "wallpaperId" to targetItem.id,
+                                "title" to targetItem.title,
+                                "isDownloaded" to targetItem.isDownloaded,
+                                "targetIndex" to targetIndex
+                            ))
+                            analytics.flushSync()
                         }, 350)
                     }
                 }
@@ -1903,6 +1915,10 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
             // Fallback: if not found, scroll to top of Explore Store
             withContext(Dispatchers.Main) {
                 nestedScrollViewMain.smoothScrollTo(0, layoutExploreStore.top)
+                analytics.logAction("notification_deep_linked_fallback", "SUCCESS", 0, mapOf(
+                    "wallpaperId" to (wallpaperId ?: "")
+                ))
+                analytics.flushSync()
             }
         }
     }
