@@ -616,7 +616,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 tvPrimaryInstruction.text = "Tap 'Set wallpaper' ➔ choose 'Home screen and lock screen'"
             }
         }
-        setApplyButtonState(isSelected = false, item = null)
+        val initialActive = repository.getActiveWallpaper()
+        setApplyButtonState(isSelected = true, item = initialActive)
     }
 
     private fun setApplyButtonState(isSelected: Boolean, item: WallpaperItem? = null) {
@@ -770,7 +771,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 downloadCloudWallpaper(item)
             },
             onApply = { item ->
-                selectWallpaper(item)
+                applyWallpaperDirectly(item)
                 if (isTopPreviewScrolledOff() || (::layoutFloatingPreviewOverlay.isInitialized && layoutFloatingPreviewOverlay.visibility == View.VISIBLE)) {
                     showFloatingPreview(item)
                 }
@@ -787,10 +788,19 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         nestedScrollViewMain.setOnScrollChangeListener(androidx.core.widget.NestedScrollView.OnScrollChangeListener { v, _, scrollY, _, _ ->
             checkFloatingButtonVisibility()
 
-            if (!isTopPreviewScrolledOff()) {
+            val isScrolledOff = isTopPreviewScrolledOff()
+            if (isScrolledOff) {
+                // When scrolled off screen, pause preview player to free 100% GPU/CPU
+                if (previewPlayer?.isPlaying == true) {
+                    try { previewPlayer?.pause() } catch (_: Exception) {}
+                }
+            } else {
                 // When reached the top height where direct preview is visible, smoothly close floating preview modal
                 if (::layoutFloatingPreviewOverlay.isInitialized && layoutFloatingPreviewOverlay.visibility == View.VISIBLE) {
                     hideFloatingPreview()
+                }
+                if (previewPlayer != null && !previewPlayer!!.isPlaying && previewSurface != null) {
+                    try { previewPlayer?.start() } catch (_: Exception) {}
                 }
             }
 
@@ -2048,30 +2058,76 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         tvActiveWallpaperSubtitle.text = "Active: ${item.title} • $modeText"
     }
 
-    private fun selectWallpaper(item: WallpaperItem) {
+    private fun isLiveWallpaperActive(): Boolean {
+        return try {
+            val wm = WallpaperManager.getInstance(this)
+            val info = wm.wallpaperInfo
+            info != null && info.packageName == packageName
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Error checking if live wallpaper is active: ${e.message}")
+            false
+        }
+    }
+
+    private fun applyWallpaperDirectly(item: WallpaperItem) {
         val start = System.currentTimeMillis()
         try {
             repository.setActiveWallpaper(item)
             adapter.setActiveId(item.id)
+            storeAdapter.selectWallpaper(item.id)
             updateSubtitle(item)
             playActiveVideoInPreview(item)
-            // Brighten up the apply button with vibrant gold and bold text
             setApplyButtonState(isSelected = true, item = item)
-            val duration = System.currentTimeMillis() - start
-            analytics.logAction("wallpaper_selected", "SUCCESS", duration, mapOf(
-                "id" to item.id,
-                "title" to item.title,
-                "category" to item.category
-            ))
-            tvMockNotificationText?.text = "${item.title} • Lock Screen Active"
-            showGlassToast("Selected '${item.title}' • Tap 'Set wallpaper' below", iconRes = R.drawable.ic_clock)
+            clearLockScreenOverrideSilently()
+
+            val isLiveActive = isLiveWallpaperActive()
+            if (isLiveActive) {
+                showGlassToast("✨ '${item.title}' applied to Lock Screen & Home Screen!", iconRes = R.drawable.ic_check)
+                tvMockNotificationText?.text = "${item.title} • Lock Screen Active"
+                analytics.logAction("set_wallpaper_direct", "SUCCESS", System.currentTimeMillis() - start, mapOf(
+                    "brand" to Build.MANUFACTURER,
+                    "model" to Build.MODEL,
+                    "wallpaperId" to item.id,
+                    "title" to item.title,
+                    "isLiveActive" to true
+                ))
+            } else {
+                showGlassToast("Applying '${item.title}' • Choose 'Home and lock screen'", iconRes = R.drawable.ic_clock)
+                when {
+                    isSamsung -> {
+                        val uri = getActiveVideoUri(item)
+                        if (uri != null) launchSamsungVideoWallpaper(uri) else openLiveWallpaperChooser()
+                    }
+                    isXiaomi -> {
+                        val uri = getActiveVideoUri(item)
+                        if (uri != null) launchXiaomiVideoWallpaper(uri) else openLiveWallpaperChooser()
+                    }
+                    else -> {
+                        openLiveWallpaperChooser()
+                    }
+                }
+                analytics.logAction("set_wallpaper_direct", "SUCCESS", System.currentTimeMillis() - start, mapOf(
+                    "brand" to Build.MANUFACTURER,
+                    "model" to Build.MODEL,
+                    "wallpaperId" to item.id,
+                    "title" to item.title,
+                    "isLiveActive" to false
+                ))
+            }
         } catch (e: Exception) {
-            val duration = System.currentTimeMillis() - start
-            analytics.logAction("wallpaper_selected", "FAILED", duration, mapOf(
-                "id" to item.id,
+            Log.e("MainActivity", "Failed to apply wallpaper: ${item.title}", e)
+            showGlassToast("Could not apply wallpaper: ${e.message}", isSuccess = false)
+            analytics.logAction("set_wallpaper_direct", "FAILED", System.currentTimeMillis() - start, mapOf(
+                "brand" to Build.MANUFACTURER,
+                "model" to Build.MODEL,
+                "wallpaperId" to item.id,
                 "title" to item.title
             ), e)
         }
+    }
+
+    private fun selectWallpaper(item: WallpaperItem) {
+        applyWallpaperDirectly(item)
     }
 
     private fun confirmDeleteWallpaper(item: WallpaperItem) {
@@ -2169,43 +2225,8 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     private fun setupListeners() {
         btnSetWallpaper.setOnClickListener {
-            if (!isWallpaperSelectedForApply || selectedWallpaperItem == null) {
-                return@setOnClickListener
-            }
-            val start = System.currentTimeMillis()
             val activeItem = selectedWallpaperItem ?: repository.getActiveWallpaper()
-            showGlassToast("Applying '${activeItem.title}' • Choose 'Home and lock screen'", iconRes = R.drawable.ic_clock)
-            try {
-                when {
-                    isSamsung -> {
-                        val uri = getActiveVideoUri(activeItem)
-                        if (uri != null) launchSamsungVideoWallpaper(uri) else openLiveWallpaperChooser()
-                    }
-                    isXiaomi -> {
-                        val uri = getActiveVideoUri(activeItem)
-                        if (uri != null) launchXiaomiVideoWallpaper(uri) else openLiveWallpaperChooser()
-                    }
-                    else -> {
-                        clearLockScreenOverrideSilently()
-                        openLiveWallpaperChooser()
-                    }
-                }
-                val duration = System.currentTimeMillis() - start
-                analytics.logAction("set_wallpaper_button_click", "SUCCESS", duration, mapOf(
-                    "brand" to Build.MANUFACTURER,
-                    "model" to Build.MODEL,
-                    "wallpaperId" to activeItem.id,
-                    "title" to activeItem.title
-                ))
-            } catch (e: Exception) {
-                val duration = System.currentTimeMillis() - start
-                analytics.logAction("set_wallpaper_button_click", "FAILED", duration, mapOf(
-                    "brand" to Build.MANUFACTURER,
-                    "model" to Build.MODEL,
-                    "wallpaperId" to activeItem.id,
-                    "title" to activeItem.title
-                ), e)
-            }
+            applyWallpaperDirectly(activeItem)
         }
 
         btnDirectGalleryHandOff.setOnClickListener {
@@ -2530,31 +2551,42 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
+            Log.d("MainActivity", "Launched ACTION_CHANGE_LIVE_WALLPAPER successfully")
             return
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w("MainActivity", "ACTION_CHANGE_LIVE_WALLPAPER failed on ${Build.MANUFACTURER} ${Build.MODEL}: ${e.message}")
+        }
 
         try {
             val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(fallbackIntent)
+            Log.d("MainActivity", "Launched ACTION_LIVE_WALLPAPER_CHOOSER successfully")
             return
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w("MainActivity", "ACTION_LIVE_WALLPAPER_CHOOSER failed: ${e.message}")
+        }
 
         try {
             val fallbackIntent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(fallbackIntent)
+            Log.d("MainActivity", "Launched ACTION_SET_WALLPAPER successfully")
             return
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w("MainActivity", "ACTION_SET_WALLPAPER failed: ${e.message}")
+        }
 
         try {
             val settingsIntent = Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(settingsIntent)
-        } catch (_: Exception) {
+            Log.d("MainActivity", "Launched ACTION_DISPLAY_SETTINGS successfully")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "All wallpaper launch intents failed: ${e.message}", e)
             Toast.makeText(this, "Please open Settings -> Wallpaper -> Live Wallpapers", Toast.LENGTH_LONG).show()
         }
     }
@@ -2933,6 +2965,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
 
     override fun onResume() {
         super.onResume()
+        try {
+            prefs.edit().putBoolean(VideoWallpaperService.KEY_APP_IN_FOREGROUND, true).apply()
+        } catch (_: Exception) {}
         updateNotificationBadge()
         syncInAppNotifications()
         updateUserAuthUI()
@@ -2951,6 +2986,9 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
     }
 
     override fun onPause() {
+        try {
+            prefs.edit().putBoolean(VideoWallpaperService.KEY_APP_IN_FOREGROUND, false).apply()
+        } catch (_: Exception) {}
         try {
             unregisterReceiver(notifReceiver)
         } catch (_: Exception) {}

@@ -47,6 +47,7 @@ class VideoWallpaperService : WallpaperService() {
         const val KEY_ACTIVE_RES_NAME = "pref_active_res_name" // e.g. "lock_wake_video", "preset_wand_wake"
         const val KEY_ACTIVE_FILE_PATH = "pref_active_file_path"
         const val KEY_ACTIVE_TIMESTAMP = "pref_active_timestamp"
+        const val KEY_APP_IN_FOREGROUND = "pref_app_in_foreground"
     }
 
     override fun onCreateEngine(): Engine = GLVideoEngine()
@@ -98,6 +99,10 @@ class VideoWallpaperService : WallpaperService() {
         private val drawRunnable = Runnable {
             isDrawPending = false
             drawFrame()
+        }
+
+        private val initMediaPlayerRunnable = Runnable {
+            initMediaPlayer()
         }
 
         // Quad coordinates (X, Y, Z, U, V)
@@ -247,13 +252,14 @@ class VideoWallpaperService : WallpaperService() {
             Log.d(TAG, "onVisibilityChanged: $visible, prepared=$isPrepared")
             glHandler?.post {
                 val mp = mediaPlayer ?: return@post
-                if (visible) {
+                val isAppInForeground = prefs.getBoolean(KEY_APP_IN_FOREGROUND, false)
+                if (visible && !isAppInForeground) {
                     if (isPrepared) {
                         try {
                             val mode = getEffectivePlaybackMode()
                             val isLocked = keyguardManager?.isKeyguardLocked ?: true
 
-                            if (mode == MODE_LOOP_LOCK_ONLY && !isLocked) {
+                            if (mode == MODE_LOOP_LOCK_ONLY && !isLocked && !isPreview) {
                                 // Already on Home Screen: keep static frame to preserve butter-smooth launcher performance
                                 if (mp.isPlaying) mp.pause()
                             } else {
@@ -304,6 +310,24 @@ class VideoWallpaperService : WallpaperService() {
         override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
             glHandler?.post {
                 when (key) {
+                    KEY_APP_IN_FOREGROUND -> {
+                        val inForeground = prefs.getBoolean(KEY_APP_IN_FOREGROUND, false)
+                        mediaPlayer?.let { mp ->
+                            try {
+                                if (inForeground) {
+                                    if (mp.isPlaying) mp.pause()
+                                } else {
+                                    if (isVisibleState && isPrepared && !mp.isPlaying) {
+                                        val mode = getEffectivePlaybackMode()
+                                        val isLocked = keyguardManager?.isKeyguardLocked ?: true
+                                        if (!(mode == MODE_LOOP_LOCK_ONLY && !isLocked && !isPreview)) {
+                                            mp.start()
+                                        }
+                                    }
+                                }
+                            } catch (_: Exception) {}
+                        }
+                    }
                     KEY_MUTE -> {
                         mediaPlayer?.let { mp ->
                             val isMuted = prefs.getBoolean(KEY_MUTE, true)
@@ -317,9 +341,10 @@ class VideoWallpaperService : WallpaperService() {
                             mp.isLooping = (mode == MODE_LOOP_LOCK_ONLY || mode == MODE_LOOP_ALWAYS)
                         }
                     }
-                    KEY_ACTIVE_TIMESTAMP, KEY_ACTIVE_ID, KEY_ACTIVE_TYPE, KEY_ACTIVE_FILE_PATH, KEY_ACTIVE_RES_NAME -> {
-                        Log.d(TAG, "Active wallpaper changed! Re-initializing MediaPlayer...")
-                        initMediaPlayer()
+                    KEY_ACTIVE_TIMESTAMP -> {
+                        Log.d(TAG, "Active wallpaper timestamp changed! Debouncing and re-initializing MediaPlayer...")
+                        glHandler?.removeCallbacks(initMediaPlayerRunnable)
+                        glHandler?.post(initMediaPlayerRunnable)
                     }
                 }
             }
