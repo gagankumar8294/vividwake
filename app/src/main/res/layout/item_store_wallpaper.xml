@@ -159,7 +159,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
                 android:max="100"
-                android:progressTint="#D4AF37"
+                android:indeterminate="true"
+                android:indeterminateTint="#22C55E"
+                android:progressTint="#22C55E"
+                android:indeterminateTintMode="src_in"
+                android:progressTintMode="src_in"
                 android:visibility="gone" />
 
             <TextView
@@ -167,9 +171,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="4dp"
-                android:text="Downloading 0%..."
-                android:textColor="#D4AF37"
+                android:text="Setting up download..."
+                android:textColor="#22C55E"
                 android:textSize="11sp"
+                android:textStyle="bold"
                 android:visibility="gone" />
 
             <!-- File Size & Gift Icon Row: Positioned directly above the action button with no gap -->

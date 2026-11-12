@@ -1,6 +1,7 @@
 package com.lockscreen.videowake
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
@@ -165,6 +166,14 @@ class StoreWallpaperAdapter(
         }
     }
 
+    fun cancelOrResetDownloading(itemId: String) {
+        downloadingProgressMap.remove(itemId)
+        val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == itemId }
+        if (idx != -1) {
+            notifyItemChanged(idx)
+        }
+    }
+
     fun updateItem(updated: WallpaperItem) {
         val idx = rows.indexOfFirst { it is StoreRow.Item && it.item.id == updated.id }
         if (idx != -1) {
@@ -303,8 +312,20 @@ class StoreWallpaperAdapter(
             if (isDownloading && currentProgress != null) {
                 pbDownload.visibility = View.VISIBLE
                 tvProgress.visibility = View.VISIBLE
-                pbDownload.progress = currentProgress
-                tvProgress.text = "Downloading $currentProgress%..."
+                val greenColor = Color.parseColor("#22C55E")
+                pbDownload.indeterminateTintList = ColorStateList.valueOf(greenColor)
+                pbDownload.progressTintList = ColorStateList.valueOf(greenColor)
+                tvProgress.setTextColor(greenColor)
+
+                if (currentProgress <= 0) {
+                    pbDownload.isIndeterminate = true
+                    tvProgress.text = "Setting up download..."
+                } else {
+                    pbDownload.isIndeterminate = false
+                    pbDownload.progress = currentProgress
+                    tvProgress.text = "Downloading $currentProgress%..."
+                }
+
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.GONE
                 btnPreview.visibility = View.GONE
@@ -327,16 +348,24 @@ class StoreWallpaperAdapter(
                 btnDeleteLocal.visibility = View.GONE
             }
 
-            // Click anywhere on card: if downloaded, select & preview it; if not downloaded, only select & highlight border without streaming or background download
-            card.setOnClickListener {
-                selectWallpaper(item.id)
-                if (item.isDownloaded) {
-                    onApply(item)
+            // Click anywhere on card: if downloading, ignore clicks to prevent accidental disruptive actions
+            if (isDownloading) {
+                card.isClickable = false
+                card.setOnClickListener(null)
+            } else {
+                card.isClickable = true
+                card.setOnClickListener {
+                    selectWallpaper(item.id)
+                    if (item.isDownloaded) {
+                        onApply(item)
+                    }
                 }
             }
 
             btnDownload.setOnClickListener {
-                onDownload(item)
+                if (!isDownloading) {
+                    onDownload(item)
+                }
             }
 
             btnApply.setOnClickListener {
@@ -356,6 +385,7 @@ class StoreWallpaperAdapter(
         }
 
         fun updateProgressOnly(progress: Int) {
+            val greenColor = Color.parseColor("#22C55E")
             if (progress >= 100) {
                 pbDownload.visibility = View.GONE
                 tvProgress.visibility = View.GONE
@@ -363,14 +393,29 @@ class StoreWallpaperAdapter(
                 btnApply.visibility = View.VISIBLE
                 btnApply.text = "Select"
                 btnDeleteLocal.visibility = View.VISIBLE
+                card.isClickable = true
             } else {
                 pbDownload.visibility = View.VISIBLE
                 tvProgress.visibility = View.VISIBLE
-                pbDownload.progress = progress
-                tvProgress.text = "Downloading $progress%..."
+                pbDownload.indeterminateTintList = ColorStateList.valueOf(greenColor)
+                pbDownload.progressTintList = ColorStateList.valueOf(greenColor)
+                tvProgress.setTextColor(greenColor)
+
+                if (progress <= 0) {
+                    pbDownload.isIndeterminate = true
+                    tvProgress.text = "Setting up download..."
+                } else {
+                    pbDownload.isIndeterminate = false
+                    pbDownload.progress = progress
+                    tvProgress.text = "Downloading $progress%..."
+                }
+
                 btnDownload.visibility = View.GONE
                 btnApply.visibility = View.GONE
+                btnPreview.visibility = View.GONE
                 btnDeleteLocal.visibility = View.GONE
+                card.isClickable = false
+                card.setOnClickListener(null)
             }
         }
 

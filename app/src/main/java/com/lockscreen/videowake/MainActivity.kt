@@ -1320,11 +1320,18 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
         }
     }
 
+    private val activeDownloadingIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     private fun downloadCloudWallpaper(item: WallpaperItem) {
         if (!authManager.isUserSignedIn) {
             showAuthRequiredDialog()
             return
         }
+        if (activeDownloadingIds.contains(item.id)) {
+            return
+        }
+        activeDownloadingIds.add(item.id)
+
         val start = System.currentTimeMillis()
         analytics.logAction("download_start", "SUCCESS", 0, mapOf(
             "id" to item.id,
@@ -1340,6 +1347,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 }
             }
 
+            activeDownloadingIds.remove(item.id)
             val duration = System.currentTimeMillis() - start
             result.onSuccess { downloadedFile ->
                 val thumbFile = File(repository.downloadManager.cloudThumbsDir, "thumb_${item.id}.jpg")
@@ -1405,7 +1413,7 @@ class MainActivity : AppCompatActivity(), TextureView.SurfaceTextureListener {
                 ))
                 analytics.flushSync()
             }.onFailure { err ->
-                storeAdapter.setDownloadingProgress(item.id, 100) // resets downloading state
+                storeAdapter.cancelOrResetDownloading(item.id) // restores normal button and clears loading
                 analytics.logAction("download_failed", "FAILED", duration, mapOf(
                     "id" to item.id,
                     "title" to item.title

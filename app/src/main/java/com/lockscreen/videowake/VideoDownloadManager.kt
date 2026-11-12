@@ -119,12 +119,17 @@ class VideoDownloadManager(private val context: Context) {
                             output.write(buffer, 0, read)
                             downloadedBytes += read
                             if (totalBytes > 0) {
-                                val progress = ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 99)
+                                val progress = ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(1, 99)
                                 val now = System.currentTimeMillis()
                                 if (progress != lastProgress && (now - lastProgressTime >= 80 || progress == 99)) {
                                     lastProgress = progress
                                     lastProgressTime = now
                                     onProgress(progress)
+                                }
+                            } else {
+                                if (lastProgress == -1) {
+                                    lastProgress = 1
+                                    onProgress(1)
                                 }
                             }
                         }
